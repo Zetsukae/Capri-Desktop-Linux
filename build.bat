@@ -19,11 +19,12 @@ echo Building Capri.exe...
 "%CSC%" /nologo /target:winexe /optimize+ /out:build\Capri.exe ^
     /win32icon:assets\chip.ico /win32manifest:app\app.manifest ^
     /reference:System.Windows.Forms.dll /reference:System.Drawing.dll ^
-    /reference:System.Runtime.Serialization.dll /reference:System.Core.dll /reference:"%SystemRoot%\Microsoft.NET\assembly\GAC_MSIL\System.Speech\v4.0_4.0.0.0__31bf3856ad364e35\System.Speech.dll" ^
+    /reference:System.Runtime.Serialization.dll /reference:System.Core.dll /reference:System.Security.dll /reference:"%SystemRoot%\Microsoft.NET\assembly\GAC_MSIL\UIAutomationClient\v4.0_4.0.0.0__31bf3856ad364e35\UIAutomationClient.dll" /reference:"%SystemRoot%\Microsoft.NET\assembly\GAC_MSIL\UIAutomationTypes\v4.0_4.0.0.0__31bf3856ad364e35\UIAutomationTypes.dll" /reference:"%SystemRoot%\Microsoft.NET\assembly\GAC_MSIL\System.Speech\v4.0_4.0.0.0__31bf3856ad364e35\System.Speech.dll" ^
     /resource:assets\capri.png,Capri.Character.png ^
     /resource:assets\perch.png,Capri.Perch.png ^
     /resource:assets\chip.ico,Capri.Chip.ico ^
     /resource:assets\chip.png,Capri.Chip.png ^
+    /resource:assets\persona.txt,Capri.Persona.txt ^
     !ART! ^
     app\Capri.cs app\AssemblyInfo.cs
 if errorlevel 1 (

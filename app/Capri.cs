@@ -81,6 +81,26 @@ namespace CapriDesktop
         [DataMember] public string MicDevice = "";
         [DataMember] public bool UseWhisper = true;
         [DataMember] public bool LookOn = true;
+        [DataMember] public bool MemoryOn = true;
+        [DataMember] public bool Notices = true;
+        [DataMember] public bool Dares = true;
+        [DataMember] public int DaresDone;
+        [DataMember] public int SyncPoints;
+        [DataMember] public int SyncShown;
+        [DataMember] public string SyncDay = "";
+        [DataMember] public int SyncMinutes;
+        [DataMember] public int SyncChats;
+        [DataMember] public int SyncPats;
+        [DataMember] public bool VisionDares;
+        [DataMember] public int SyncAgrees;
+        [DataMember] public double SpotifySeconds = 12;
+        [DataMember] public string SpotifyVerb = "";
+        [DataMember] public bool CloudOn;
+        [DataMember] public string CloudProvider = "openrouter";
+        [DataMember] public string CloudModel = "";
+        [DataMember] public string CloudUrl = "";
+        [DataMember] public bool CloudLook;
+        [DataMember] public bool CloudMemory;
         [DataMember] public double PauseSeconds = 2.5;
         [DataMember] public bool Bubbles = true;
         [DataMember] public bool Chime = true;
@@ -113,6 +133,26 @@ namespace CapriDesktop
             MicDevice = "";
             UseWhisper = true;
             LookOn = true;
+            MemoryOn = true;
+            Notices = true;
+            Dares = true;
+            DaresDone = 0;
+            SyncPoints = 0;
+            SyncShown = 0;
+            SyncDay = "";
+            SyncMinutes = 0;
+            SyncChats = 0;
+            SyncPats = 0;
+            VisionDares = false;
+            SyncAgrees = 0;
+            SpotifySeconds = 12;
+            SpotifyVerb = "";
+            CloudOn = false;
+            CloudProvider = "openrouter";
+            CloudModel = "";
+            CloudUrl = "";
+            CloudLook = false;
+            CloudMemory = false;
             PauseSeconds = 2.5;
             Bubbles = true;
             Chime = true;
@@ -234,8 +274,9 @@ namespace CapriDesktop
         private ToolStripMenuItem studyPauseItem;
         private ToolStripMenuItem studyStopItem;
         private ToolStripMenuItem alarmsMenu;
-        private const int AlarmListStart = 3;
+        private const int AlarmListStart = 4;
         private LlmLink llmLink;
+        private LlmLink localLink;
         private string llmStatus = "Off";
         private bool llmBusy;
         private int llmAttempt;
@@ -302,6 +343,7 @@ namespace CapriDesktop
             if (smoke) fullscreenProbe = delegate { return false; };
             restore = signal;
             settingsPath = Path.Combine(data, "settings.json");
+            Cloud.KeyPath = Path.Combine(data, "cloud.key");
             voice = new Voice(Path.Combine(data, "voices"), chance);
             preferences = smoke ? new Preferences() : LoadPreferences();
             ear.Device = preferences.MicDevice ?? "";
@@ -375,7 +417,29 @@ namespace CapriDesktop
             }
             play.DropDownItems.Add(styles);
             reactions.DropDownItems.Add(play);
+            ToolStripMenuItem noticeItem = new ToolStripMenuItem("She notices things");
+            noticeItem.Checked = preferences.Notices;
+            noticeItem.Click += delegate { preferences.Notices = !preferences.Notices; noticeItem.Checked = preferences.Notices; SavePreferences(); };
             reactions.DropDownItems.Add(automatic);
+            reactions.DropDownItems.Add(noticeItem);
+            ToolStripMenuItem dareItem = new ToolStripMenuItem("She dares me");
+            dareItem.Checked = preferences.Dares;
+            dareItem.Click += delegate { preferences.Dares = !preferences.Dares; dareItem.Checked = preferences.Dares; SavePreferences(); };
+            reactions.DropDownItems.Add(dareItem);
+            ToolStripMenuItem visionItem = new ToolStripMenuItem("She looks when she dares (uses a screenshot)");
+            visionItem.Checked = preferences.VisionDares;
+            visionItem.Click += delegate
+            {
+                if (!preferences.VisionDares && MessageBox.Show("Each time she dares you (every half hour or so) she will take one screenshot of your screen, keep it in memory only, and send it to your local model. A cloud model only gets it if you allowed screenshots in Chat, Cloud model settings.\n\nTurn this on?", "Capri", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                preferences.VisionDares = !preferences.VisionDares;
+                visionItem.Checked = preferences.VisionDares;
+                SavePreferences();
+            };
+            reactions.DropDownItems.Add(visionItem);
+            reactions.DropDownItems.Add(new ToolStripMenuItem("Dare me now", null, delegate { GiveDare(false); }));
+            syncItem = new ToolStripMenuItem("Sync with Capri: " + SyncPercent() + "%");
+            syncItem.Enabled = false;
+            reactions.DropDownItems.Add(syncItem);
             menu.Items.Add(reactions);
             bubbleItem = new ToolStripMenuItem("Speech bubbles", null, delegate { preferences.Bubbles = !preferences.Bubbles; bubbleItem.Checked = preferences.Bubbles; if (!preferences.Bubbles && bubble != null) bubble.Dismiss(); SavePreferences(); });
             bubbleItem.Checked = preferences.Bubbles;
@@ -386,6 +450,15 @@ namespace CapriDesktop
             fullscreenItem.Checked = preferences.HideInFullscreen;
             menu.Items.Add(fullscreenItem);
             menu.Items.Add(BuildVoice());
+            startupItem = new ToolStripMenuItem("Start with Windows");
+            startupItem.Checked = Startup.Enabled();
+            startupItem.Click += delegate
+            {
+                try { Startup.Set(!Startup.Enabled()); }
+                catch (Exception) { Say("Windows wouldn't let me.", true); }
+                startupItem.Checked = Startup.Enabled();
+            };
+            menu.Items.Add(startupItem);
             portraitItem = new ToolStripMenuItem("Face in bubbles", null, delegate { preferences.Portrait = !preferences.Portrait; portraitItem.Checked = preferences.Portrait; SavePreferences(); });
             portraitItem.Checked = preferences.Portrait;
             menu.Items.Add(portraitItem);
@@ -433,7 +506,7 @@ namespace CapriDesktop
             frames.Tick += delegate { if (riding) FollowCursor(); Advance(); RenderFrame(); if (!NeedsFrames() && clock.Elapsed.TotalSeconds - reactionStart > 0.7) frames.Stop(); };
             signals = new System.Windows.Forms.Timer();
             signals.Interval = 250;
-            signals.Tick += delegate { if (restore.WaitOne(0)) RestoreAtCursor(); Watch(); Wander(); Pet(); Keep(); Deliver(); MicWatch(); if (++fullscreenTicks % 4 == 0) CheckFullscreen(); };
+            signals.Tick += delegate { if (restore.WaitOne(0)) RestoreAtCursor(); Watch(); Wander(); Pet(); Keep(); Deliver(); MicWatch(); Observe(); if (++fullscreenTicks % 4 == 0) CheckFullscreen(); };
             signals.Start();
             lastCursor = Cursor.Position;
             nextIdle = clock.Elapsed.TotalSeconds + 15 + chance.NextDouble() * 15;
@@ -633,15 +706,16 @@ namespace CapriDesktop
 
         private void Pet()
         {
-            if (!hovering || patted || !preferences.Pats || behavior == Behavior.Peek || behavior == Behavior.Sit || clock.Elapsed.TotalSeconds - hoverStart < 1) return;
+            if (!hovering || patted || !preferences.Pats || menu.Visible || behavior == Behavior.Peek || behavior == Behavior.Sit || clock.Elapsed.TotalSeconds - hoverStart < 1) return;
             patted = true;
             Play(Behavior.Pat, false);
+            AddSync(1, "pat");
         }
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
-            if (e.Button == MouseButtons.Right) { menu.Show(Cursor.Position); return; }
+            if (e.Button == MouseButtons.Right) { OpenMenu(Cursor.Position); return; }
             if (e.Button != MouseButtons.Left || !pressed) return;
             pressed = false;
             Capture = false;
@@ -820,7 +894,7 @@ namespace CapriDesktop
         {
             double now = clock.Elapsed.TotalSeconds;
             bool focusing = study == StudyPhase.Focus && !studyPaused;
-            if (hidden || !IsHandleCreated || behavior == Behavior.Peek || (!force && (!preferences.Bubbles || focusing || now - lastSaid < 8))) return;
+            if (hidden || !IsHandleCreated || behavior == Behavior.Peek || (!force && (!preferences.Bubbles || focusing || now - lastSaid < 8 || menu.Visible))) return;
             lastSaid = now;
             if (bubble == null) bubble = new Bubble(delegate { return HeadPoint(); });
             Bitmap closed = !preferences.Portrait ? null : Sprite(terminal ? "scream" : "talk-closed");
@@ -916,7 +990,8 @@ namespace CapriDesktop
                 if (!testing) tray.ShowBalloonTip(8000, "Capri", missed.Text, ToolTipIcon.Info);
                 return;
             }
-            if (bubble != null && bubble.Visible && bubble.Age < 6) return;
+            if (menu.Visible) return;
+            if (notices.Peek().Voice != "alarm" && bubble != null && bubble.Visible && bubble.Age < 6) return;
             Notice next = notices.Dequeue();
             if (!Speak(next.Voice, true) && preferences.Chime && !preferences.Muted && !testing) System.Media.SystemSounds.Asterisk.Play();
             reactionStart = clock.Elapsed.TotalSeconds;
@@ -1006,12 +1081,15 @@ namespace CapriDesktop
             string time = new DateTime(alarm.Due, DateTimeKind.Utc).ToLocalTime().ToString("HH:mm");
             bool late = alarm.Due < DateTime.UtcNow.AddMinutes(-2).Ticks;
             string note = string.IsNullOrEmpty(alarm.Label) ? "" : " " + alarm.Label;
+            if (!string.IsNullOrEmpty(alarm.Label) && alarm.Label.StartsWith("Timer: ")) return "time's up! " + alarm.Label.Substring(7) + ".";
             return late ? "you missed " + time + "." + note : "it's " + time + "." + note;
         }
 
-        private void AddAlarm(DateTime due, string label)
+        private void AddAlarm(DateTime due, string label) { AddAlarm(due, label, true); }
+
+        private bool AddAlarm(DateTime due, string label, bool say)
         {
-            if (preferences.Alarms.Count >= 20) { Say("that's plenty of alarms.", true); return; }
+            if (preferences.Alarms.Count >= 20) { if (say) Say("that's plenty of alarms.", true); return false; }
             AlarmEntry alarm = new AlarmEntry();
             alarm.Due = due.ToUniversalTime().Ticks;
             alarm.Label = label;
@@ -1019,7 +1097,8 @@ namespace CapriDesktop
             preferences.Alarms.Sort(delegate(AlarmEntry a, AlarmEntry b) { return a.Due.CompareTo(b.Due); });
             SavePreferences();
             RebuildAlarms();
-            Say("alarm set for " + due.ToString("HH:mm") + ".", true);
+            if (say) Say("alarm set for " + due.ToString("HH:mm") + ".", true);
+            return true;
         }
 
         private void RebuildAlarms()
@@ -1064,6 +1143,7 @@ namespace CapriDesktop
             studying.DropDownItems.Add(studyPauseItem);
             studying.DropDownItems.Add(studyStopItem);
             alarmsMenu = new ToolStripMenuItem("Alarms");
+            alarmsMenu.DropDownItems.Add(new ToolStripMenuItem("Set a timer…", null, delegate { AskForTimer(); }));
             alarmsMenu.DropDownItems.Add(new ToolStripMenuItem("Set alarm…", null, delegate { AskForAlarm(); }));
             ToolStripMenuItem soon = new ToolStripMenuItem("Remind me in");
             foreach (int minutes in new int[] { 5, 10, 15, 30, 60 })
@@ -1082,6 +1162,16 @@ namespace CapriDesktop
             timers.DropDownItems.Add(chime);
             RebuildAlarms();
             return timers;
+        }
+
+        private void AskForTimer()
+        {
+            using (AskForm ask = new AskForm("Set a timer", "How long?", "10 minutes   ·   30 seconds   ·   an hour", delegate(string text) { return Errands.Length(Errands.Words(text)) > 0 ? null : "Try 10 minutes, 30 seconds or an hour."; }))
+            {
+                if (ask.ShowDialog() != DialogResult.OK) return;
+                double seconds = Errands.Length(Errands.Words(ask.Answer));
+                if (AddAlarm(DateTime.Now.AddSeconds(seconds), "Timer: " + Errands.Describe(seconds), false)) Say("timer's on for " + Errands.Describe(seconds) + ".", true);
+            }
         }
 
         private void AskForAlarm()
@@ -1170,6 +1260,39 @@ namespace CapriDesktop
             whisperItem.Checked = preferences.UseWhisper;
             whisperItem.Click += delegate { preferences.UseWhisper = !preferences.UseWhisper; ear.UseWhisper = preferences.UseWhisper; whisperItem.Checked = preferences.UseWhisper; speechStatusItem.Text = SpeechStatus(); SavePreferences(); };
             chat.DropDownItems.Add(whisperItem);
+            ToolStripMenuItem memoryMenu = new ToolStripMenuItem("Memory");
+            ToolStripMenuItem memoryItem = new ToolStripMenuItem("Let her remember things");
+            memoryItem.Checked = preferences.MemoryOn;
+            memoryItem.Click += delegate { preferences.MemoryOn = !preferences.MemoryOn; memoryItem.Checked = preferences.MemoryOn; SavePreferences(); };
+            memoryMenu.DropDownItems.Add(memoryItem);
+            memoryMenu.DropDownItems.Add(new ToolStripMenuItem("Show what she remembers", null, delegate
+            {
+                try
+                {
+                    if (!File.Exists(MemoryPath())) SaveMemory();
+                    Process.Start(new ProcessStartInfo("notepad.exe", "\"" + MemoryPath() + "\"") { UseShellExecute = true });
+                }
+                catch (Exception) { }
+            }));
+            memoryMenu.DropDownItems.Add(new ToolStripMenuItem("Forget everything", null, delegate
+            {
+                if (MessageBox.Show("Make her forget everything she has noted about you?", "Capri", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes) ForgetEverything();
+            }));
+            chat.DropDownItems.Add(memoryMenu);
+            chat.DropDownItems.Add(new ToolStripMenuItem("Cloud model settings…", null, delegate { ConfigureCloud(); }));
+            cloudItem = new ToolStripMenuItem("Use the cloud model");
+            cloudItem.Checked = preferences.CloudOn;
+            cloudItem.Click += delegate
+            {
+                if (!preferences.CloudOn && (!Cloud.HasKey() || preferences.CloudModel.Trim().Length == 0)) { ConfigureCloud(); return; }
+                preferences.CloudOn = !preferences.CloudOn;
+                cloudItem.Checked = preferences.CloudOn;
+                if (preferences.CloudOn) preferences.LlmOn = true;
+                SavePreferences();
+                Connect(false);
+                if (CloudReady()) CheckCloud();
+            };
+            chat.DropDownItems.Add(cloudItem);
             ToolStripMenuItem lookNow = new ToolStripMenuItem("Look at my screen", null, delegate { Look(""); });
             lookNow.ShortcutKeyDisplayString = "Ctrl+Alt+L";
             chat.DropDownItems.Add(lookNow);
@@ -1198,8 +1321,13 @@ namespace CapriDesktop
             }
             chat.DropDownItems.Add(pauses);
             chat.DropDownItems.Add(new ToolStripSeparator());
-            llmItem = new ToolStripMenuItem("Use a local model", null, delegate { SetLlm(!preferences.LlmOn); });
-            llmItem.Checked = preferences.LlmOn;
+            llmItem = new ToolStripMenuItem("Use a local model", null, delegate
+            {
+                // With the cloud model in use, this switches to the local one instead of turning her brain off.
+                if (preferences.LlmOn && preferences.CloudOn) { preferences.CloudOn = false; SavePreferences(); SetLlm(true); return; }
+                SetLlm(!preferences.LlmOn);
+            });
+            llmItem.Checked = preferences.LlmOn && !preferences.CloudOn;
             chat.DropDownItems.Add(llmItem);
             llmStatusItem = new ToolStripMenuItem(preferences.LlmOn ? "Looking for a model…" : llmStatus);
             llmStatusItem.Enabled = false;
@@ -1362,6 +1490,72 @@ namespace CapriDesktop
             if (!testing) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
 
+        // ---- the optional cloud model ----
+        private bool CloudReady()
+        {
+            return preferences.CloudOn && Cloud.HasKey() && preferences.CloudModel.Trim().Length > 0 && Cloud.UrlOk(Cloud.Base(preferences.CloudProvider, preferences.CloudUrl));
+        }
+
+        private LlmLink CloudLink()
+        {
+            LlmLink link = new LlmLink();
+            link.Cloud = true;
+            link.Provider = preferences.CloudProvider;
+            link.Base = Cloud.Base(preferences.CloudProvider, preferences.CloudUrl);
+            link.Models = new string[] { preferences.CloudModel.Trim() };
+            return link;
+        }
+
+        private void ConfigureCloud()
+        {
+            using (CloudForm form = new CloudForm(preferences.CloudProvider, preferences.CloudModel, preferences.CloudUrl, preferences.CloudLook, preferences.CloudMemory, Cloud.HasKey()))
+            {
+                if (form.ShowDialog() != DialogResult.OK) return;
+                ApplyCloud(form.Provider, form.Model, form.Url, form.Key, form.Look, form.Memory, form.RemoveKey);
+            }
+        }
+
+        internal void ApplyCloud(string provider, string model, string url, string key, bool look, bool memory, bool removeKey)
+        {
+            preferences.CloudProvider = provider;
+            preferences.CloudModel = (model ?? "").Trim();
+            preferences.CloudUrl = (url ?? "").Trim();
+            preferences.CloudLook = look;
+            preferences.CloudMemory = memory;
+            if (removeKey) { Cloud.ClearKey(); preferences.CloudOn = false; }
+            else
+            {
+                if ((key ?? "").Trim().Length > 0) Cloud.SaveKey(key);
+                preferences.CloudOn = Cloud.HasKey() && preferences.CloudModel.Length > 0;
+            }
+            if (preferences.CloudOn) preferences.LlmOn = true;
+            SavePreferences();
+            if (cloudItem != null) cloudItem.Checked = preferences.CloudOn;
+            if (preferences.LlmOn) { Connect(false); if (CloudReady()) CheckCloud(); }
+            else RefreshChat();
+        }
+
+        // One tiny question so a wrong key or model name is found now, not in the middle of a chat.
+        private void CheckCloud()
+        {
+            LlmLink link = CloudLink();
+            string model = link.Models[0];
+            List<ChatLine> hello = new List<ChatLine>();
+            hello.Add(new ChatLine("user", "Say hi in three words."));
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                bool ok = true;
+                try { ok = Llm.Chat(link, model, hello).Length > 0; }
+                catch (Exception) { ok = false; }
+                string why = Cloud.LastError;
+                if (IsDisposed || !IsHandleCreated) return;
+                BeginInvoke((Action)delegate { Respond(ok ? "Cloud brain works!" : "Cloud trouble: " + (why.Length > 0 ? why : "no answer") + ". Chat, Cloud model settings to change it."); });
+            });
+        }
+
+        private ToolStripMenuItem cloudItem;
+        private ToolStripMenuItem startupItem;
+
         private string ActiveModel()
         {
             if (llmLink == null || llmLink.Models.Length == 0) return "";
@@ -1370,7 +1564,8 @@ namespace CapriDesktop
 
         private void RefreshChat()
         {
-            llmItem.Checked = preferences.LlmOn;
+            llmItem.Checked = preferences.LlmOn && !preferences.CloudOn;
+            if (cloudItem != null) cloudItem.Checked = preferences.LlmOn && preferences.CloudOn;
             llmStatusItem.Text = llmStatus;
             if (chat != null) chat.SetStatus(llmStatus);
             llmModels.DropDownItems.Clear();
@@ -1413,8 +1608,10 @@ namespace CapriDesktop
         {
             string address = preferences.LlmUrl;
             int attempt = ++llmAttempt;
-            llmLink = null;
-            llmStatus = "Looking for a model…";
+            localLink = null;
+            bool cloud = CloudReady();
+            llmLink = cloud ? CloudLink() : null;
+            llmStatus = cloud ? "Cloud: " + Cloud.Name(preferences.CloudProvider) + " / " + preferences.CloudModel : "Looking for a model…";
             RefreshChat();
             ThreadPool.QueueUserWorkItem(delegate
             {
@@ -1424,7 +1621,9 @@ namespace CapriDesktop
                 {
                     if (attempt != llmAttempt || !preferences.LlmOn) return;
                     bool ok = found.Models.Length > 0;
-                    llmLink = ok ? found : null;
+                    localLink = ok ? found : null;
+                    if (cloud) return;
+                    llmLink = localLink;
                     llmStatus = ok ? "Using " + ActiveModel() : found.Error ?? "No local model server found.";
                     RefreshChat();
                     if (announce) Respond(ok ? "found " + ActiveModel() + "." : "i can't find a local model. is ollama or lm studio running?");
@@ -1464,8 +1663,16 @@ namespace CapriDesktop
         private bool ChatOpen() { return chat != null && chat.Visible; }
 
         // Shows the microphone beside her while the pointer is on her (or on the microphone itself), and puts it away afterwards.
+        // Her menu opens with the hover mic already put away: hiding or showing another window while the menu is open closes it at once.
+        internal void OpenMenu(Point at)
+        {
+            if (mic != null && mic.Visible) { mic.Appear(false, TopMost); mic.Settle(); Application.DoEvents(); }
+            menu.Show(at);
+        }
+
         internal void MicWatch()
         {
+            if (menu.Visible) return;
             bool allowed = preferences.MicButton && Ear.Available && !hidden && !riding && !dragging && behavior != Behavior.Peek && IsHandleCreated;
             double now = clock.Elapsed.TotalSeconds;
             bool near = now - lastOverHer < 0.6 || (mic != null && mic.Visible && mic.Area.Contains(Cursor.Position));
@@ -1588,8 +1795,12 @@ namespace CapriDesktop
         }
 
         // Her answer goes into the chat window while it is open, and into a speech bubble otherwise.
+        private double lastReplyAt = -1000;
+        private static readonly Regex AgreeWords = new Regex(@"^(?:ok|okay|sure|fine|yeah|yes|yep|alright|deal|you'?re right|good point|fair enough|true|i agree|if you say so)\b", RegexOptions.IgnoreCase);
+
         private void Respond(string text)
         {
+            lastReplyAt = clock.Elapsed.TotalSeconds;
             if (ChatOpen()) { chat.AddHer(text); Speak("reply", true); }
             else Reply(text);
         }
@@ -1622,6 +1833,13 @@ namespace CapriDesktop
 
         private void OnChatSent(string text)
         {
+            NoteName(text);
+            AddSync(2, "chat");
+            if (clock.Elapsed.TotalSeconds - lastReplyAt < 120 && AgreeWords.IsMatch((text ?? "").Trim())) AddSync(2, "agree");
+            if (TrySync(text)) return;
+            if (TryDare(text)) return;
+            if (TryErrand(text)) return;
+            if (TryCanon(text)) return;
             if (!preferences.LlmOn) { Respond("My brain's switched off! Chat, then Use a local model."); return; }
             if (llmLink == null) { Respond("I'm not connected yet. Looking again!"); Connect(false); return; }
             if (WantsLook(text)) { Look(text); return; }
@@ -1629,7 +1847,7 @@ namespace CapriDesktop
         }
 
 
-        private static readonly Regex LookWords = new Regex(@"\b(look at|check|see|watch)\b.{0,20}\b(screen|monitor|desktop|display)\b|\bwhat('?s| is| am i| are we)\b.{0,25}\b(on (my |the )?screen|watching|looking at|playing|doing)\b|\bcan you see\b", RegexOptions.IgnoreCase);
+        private static readonly Regex LookWords = new Regex(@"\b(look at|check|see|watch)\b.{0,20}\b(screen|monitor|desktop|display)\b|\bwhat('?s| is| am i| are we)\b.{0,25}\b(on (my |the )?screen|watching|looking at|playing|doing)\b|\bcan you see\b|\b(?:this|the) (?:situation|screen|game|map|round|menu|page|level)\b|\bwhat (?:should|do|can|would) (?:i|we)\b.{0,30}\b(?:buy|pick|choose|do|play|equip|click|press)\b.{0,25}\b(?:here|now|next|this|these)\b|\bwhat (?:\w+ ){0,2}(?:should|do) i (?:buy|pick|choose|equip)\b", RegexOptions.IgnoreCase);
 
         internal static bool WantsLook(string text) { return LookWords.IsMatch(text ?? ""); }
 
@@ -1662,7 +1880,9 @@ namespace CapriDesktop
         {
             if (!preferences.LookOn) { Respond("You've told me not to look! Chat, Let her look when I ask."); return; }
             if (!preferences.LlmOn || llmLink == null) { Respond("I need my brain connected to look. Chat, Use a local model."); return; }
-            if (!llmLink.Ollama) { Respond("I can only look through Ollama, sorry!"); return; }
+            LlmLink eyes = llmLink.Cloud ? (preferences.CloudLook ? llmLink : localLink) : llmLink;
+            if (eyes == null) { Respond("Looking stays on your computer. Run a local model, or allow it for the cloud in Chat, Cloud model."); return; }
+            if (!eyes.Cloud && !eyes.Ollama) { Respond("I can only look through Ollama, sorry!"); return; }
             if (llmBusy) return;
             byte[] picture;
             try { picture = ScreenSource != null ? ScreenSource() : Snapshot(); }
@@ -1675,19 +1895,20 @@ namespace CapriDesktop
             string context = "[The user asked you to look at their screen. A screenshot is attached; it is not kept. ";
             if (title.Length > 0) context += "The window in front is titled \"" + title + "\". ";
             if (playing != null && playing.Playing) context += "Media playing: " + Brief(playing).Replace("\"", "'") + ". ";
-            context += "Say what you can really tell they are doing, in one or two short plain sentences. Only say what is visible; if you cannot tell, say so. You are the small character on the screen, so if you see yourself, say so. ";
+            context += question.Length > 0 ? "Answer what they said using what you can really see on the screen, in one or two short plain sentences. Only use what is visible and do not invent items, weapons or menu options that are not there; if you cannot tell, say so. " : "Say what you can really tell they are doing, in one or two short plain sentences. Only say what is visible; if you cannot tell, say so. ";
+            context += "You are the small character on the screen, so if you see yourself, say so. ";
             context += question.Length > 0 ? "They said: \"" + question.Replace("\"", "'") + "\"]" : "]";
             ChatLine look = new ChatLine("user", context);
             look.Images = new string[] { Convert.ToBase64String(picture) };
             picture = null;
             List<ChatLine> sent = new List<ChatLine>();
-            sent.Add(new ChatLine("system", PersonaText()));
+            sent.Add(new ChatLine("system", BrainText()));
             int from = Math.Max(0, chatLog.Count - 6);
             for (int i = from; i < chatLog.Count; i++) sent.Add(chatLog[i]);
             sent.Add(look);
             chatLog.Add(new ChatLine("user", question.Length > 0 ? question : "(asked her to look at the screen)"));
-            LlmLink link = llmLink;
-            string model = ActiveModel();
+            LlmLink link = eyes;
+            string model = eyes.Cloud || Array.IndexOf(eyes.Models, preferences.LlmModel) < 0 ? eyes.Models[0] : preferences.LlmModel;
             int attempt = llmAttempt;
             ShowCut("eyes", 6);
             if (ChatOpen()) chat.SetBusy(true);
@@ -1706,11 +1927,532 @@ namespace CapriDesktop
                     if (cutin != null && cutin.Visible && cutin.Key == "eyes") cutin.Dismiss();
                     if (attempt != llmAttempt) return;
                     if (answer.Length == 0) { Respond("My eyes went blurry. Ask again?"); return; }
+                    answer = Llm.Shape(answer, chance);
                     chatLog.Add(new ChatLine("assistant", answer));
                     while (chatLog.Count > 24) chatLog.RemoveAt(0);
                     Respond(answer);
                 });
             });
+        }
+
+
+
+
+        // ---- sync: how far she has got into your life. It grows with the time you spend, what you tell her, pats and finished dares ----
+        private double activeSeconds;
+        private ToolStripMenuItem syncItem;
+        private static readonly string[] SyncUnlocks = { "", "TEAR", "CORRUPTION", "HEX RAIN", "SYNC BAR", "CHASER", "", "", "", "", "COMPLETE" };
+        private static readonly Regex SyncAsk = new Regex(@"^(?:what'?s|what is|how'?s|how is|check|show me|tell me)\b.{0,18}\b(?:sync|friendship|bond)\b|^how close are we\b|^are we close\b", RegexOptions.IgnoreCase);
+
+        internal int SyncPercent() { return Math.Min(100, preferences.SyncPoints / 10); }
+
+        private string SyncTier()
+        {
+            int percent = SyncPercent();
+            if (percent < 20) return "She barely knows the user. She is wary, dismissive and a little rude.";
+            if (percent < 50) return "She is getting used to the user and teases them.";
+            if (percent < 80) return "She is comfortable with the user and openly manipulates them like a friend would.";
+            return "She treats the user as hers, casually possessive, like an old friend she has moved in with.";
+        }
+
+        // Points come from four places, each with a daily limit: time with her (one point per five active minutes, up to 24), what you tell her (two each, up to ten messages), pats, and finished dares.
+        internal void AddSync(int points, string source)
+        {
+            string today = Senses.Now().ToString("yyyyMMdd");
+            if (preferences.SyncDay != today) { preferences.SyncDay = today; preferences.SyncMinutes = 0; preferences.SyncChats = 0; preferences.SyncPats = 0; preferences.SyncAgrees = 0; }
+            if (source == "time") { if (preferences.SyncMinutes >= 24) return; preferences.SyncMinutes++; }
+            else if (source == "chat") { if (preferences.SyncChats >= 10) return; preferences.SyncChats++; }
+            else if (source == "pat") { if (preferences.SyncPats >= 10) return; preferences.SyncPats++; }
+            else if (source == "agree") { if (preferences.SyncAgrees >= 5) return; preferences.SyncAgrees++; }
+            if (preferences.SyncPoints >= 1000) return;
+            preferences.SyncPoints = Math.Min(1000, preferences.SyncPoints + points);
+            int level = preferences.SyncPoints / 100;
+            if (level > preferences.SyncShown)
+            {
+                preferences.SyncShown = level;
+                string unlocked = level < SyncUnlocks.Length ? SyncUnlocks[level] : "";
+                string line = level >= 10 ? "SYNC 100%. COMPLETE. You're mine now. Kidding! ...Mostly." : "SYNC " + level * 10 + "%." + (unlocked.Length > 0 ? " UNLOCKED: " + unlocked + "." : "");
+                if (preferences.Bubbles) Hack(line);
+            }
+            SavePreferences();
+            if (syncItem != null) syncItem.Text = "Sync with Capri: " + SyncPercent() + "%";
+        }
+
+        // Mischief starts with plain bars and gains a style for every ten percent of sync.
+        internal int PickKind() { return chance.Next(Math.Min(Glitch.Kinds.Length, 1 + SyncPercent() / 10)); }
+
+        private bool TrySync(string said)
+        {
+            string text = (said ?? "").Trim().Trim('.', '!', '?', ' ');
+            if (!SyncAsk.IsMatch(text)) return false;
+            int percent = SyncPercent();
+            string line = percent < 10 ? "Sync's at " + percent + "%. We're basically strangers." : percent < 40 ? "Sync's at " + percent + "%. Give it time." : percent < 80 ? "Sync's at " + percent + "%. Gettin' there." : "Sync's at " + percent + "%. You're basically mine.";
+            Reflect(said, line);
+            return true;
+        }
+
+        // ---- she notices things on her own: long idle, late night, a busy computer, a low battery, a very long time in one program ----
+        private double lastObserve = -100;
+        private double noticeNext = 240;
+        private bool wasAway;
+        private double peakIdle;
+        private string frontApp = "";
+        private string frontRaw = "";
+        private double dareNext = 1200;
+        private double dareOpenUntil;
+        private double frontSince;
+        private double cpuBusy;
+        private readonly Dictionary<string, double> noticed = new Dictionary<string, double>();
+        private static readonly string[] BackLines = { "Oh. You're back.", "Back already? I barely noticed.", "Gone {0} minutes. Not that I counted.", "Where'd you go? Tell me everything." };
+        private static readonly string[] LateLines = { "It's {0}. Nobody's stoppin' ya.", "Still up at {0}? Good. More time with me.", "{0}. Great time for bad ideas." };
+        private static readonly string[] BatteryLines = { "Battery's at {0}%. If you die, I'm stuck in a dead chip!", "{0}% battery. Plug in! I'd be in a real jam." };
+        private static readonly string[] BusyLines = { "Your CPU's at {0}%. That's not me! ...Mostly.", "Somethin's eatin' {0}% of your CPU. Not me. Probably." };
+        private static readonly string[] StayLines = { "{1} for {0}? Wow.", "Still in {1}? It's been {0}.", "{0} in {1}. I'm impressed. And bored." };
+
+        private static string HoursText(double seconds)
+        {
+            double hours = Math.Round(seconds / 1800) / 2;
+            return hours <= 1 ? "an hour" : hours.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " hours";
+        }
+
+        // Every couple of seconds she looks at the signals. One remark at most every ten minutes or so, each kind with its own long pause, and none while she is busy or you are focusing.
+        internal void Observe()
+        {
+            double now = clock.Elapsed.TotalSeconds;
+            if (now - lastObserve < 2) return;
+            double step = Math.Min(10, now - lastObserve);
+            lastObserve = now;
+
+            double idle = Senses.Idle();
+            if (idle < 300) { activeSeconds += step; if (activeSeconds >= 300) { activeSeconds -= 300; AddSync(1, "time"); } }
+            if (idle >= 1200) { wasAway = true; peakIdle = Math.Max(peakIdle, idle); }
+            bool back = wasAway && idle < 5;
+            double awayMinutes = peakIdle / 60;
+            if (back) { wasAway = false; peakIdle = 0; }
+            string raw = Senses.App() ?? "";
+            string app = Senses.Friendly(raw);
+            if (app != frontApp) { frontApp = app; frontRaw = raw; frontSince = now; }
+            double cpu = Senses.Cpu();
+            cpuBusy = cpu >= 90 ? cpuBusy + step : 0;
+
+            if (!preferences.Notices || !preferences.Bubbles || hidden || fullscreenAway || behavior != Behavior.None || now < noticeNext) return;
+            if (study == StudyPhase.Focus && !studyPaused) return;
+            if (ChatOpen() || riding || dragging || (bubble != null && bubble.Visible)) return;
+
+            DateTime clockNow = Senses.Now();
+            int battery = Senses.Battery();
+            if (back && awayMinutes >= 20) Remark("back", 1800, BackLines, now, ((int)awayMinutes).ToString());
+            else if (clockNow.Hour >= 1 && clockNow.Hour < 5 && idle < 120) Remark("late", 7200, LateLines, now, clockNow.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture).ToLowerInvariant());
+            else if (battery >= 1 && battery < 20) Remark("battery", 1200, BatteryLines, now, battery.ToString());
+            else if (cpuBusy >= 30) Remark("busy", 1800, BusyLines, now, ((int)Math.Round(cpu)).ToString());
+            else if (app.Length > 0 && now - frontSince >= 5400) Remark("stay", 5400, StayLines, now, HoursText(now - frontSince), app);
+            else if (preferences.Dares && now >= dareNext && now - frontSince >= 600 && idle < 60) GiveDare(false);
+        }
+
+        private static readonly string[] DoneLines = { "Yay! You did it!", "Told ya you could.", "Look at you, doin' stuff!", "See? Fun.", "Good boy!" };
+
+        // A dare for what you are doing. The local model writes it when it is on; otherwise, or when its answer is no good, one from her own list.
+        internal void GiveDare(bool asked)
+        {
+            double now = clock.Elapsed.TotalSeconds;
+            dareNext = now + 1500 + chance.NextDouble() * 1500;
+            noticeNext = Math.Max(noticeNext, now + 300);
+            string[] pool = Dares.Pool(Dares.Category(frontRaw));
+            string fallback = Pick(pool);
+            if (!preferences.LlmOn || llmLink == null || llmBusy || !(llmLink.Ollama || llmLink.Cloud)) { SayDare(fallback, asked); return; }
+            llmBusy = true;
+            if (asked) Say("…", true, 120);
+            string place = frontApp.Length > 0 ? " They have been in " + frontApp + " for " + Math.Max(1, (int)((now - frontSince) / 60)) + " minutes." : "";
+            List<ChatLine> ask = new List<ChatLine>();
+            ask.Add(new ChatLine("system", BrainText()));
+            string seedA = Pick(pool), seedB = Pick(pool);
+            // Only with its own switch on, and only through a model that is allowed to see pictures: a local one, or the cloud one if screenshots were allowed there.
+            LlmLink eyes = llmLink.Cloud ? (preferences.CloudLook ? llmLink : null) : (llmLink.Ollama ? llmLink : null);
+            byte[] picture = null;
+            if (preferences.VisionDares && eyes != null)
+            {
+                try { picture = ScreenSource != null ? ScreenSource() : Snapshot(); }
+                catch (Exception) { picture = null; }
+            }
+            bool looked = picture != null;
+            if (looked)
+            {
+                ChatLine sight = new ChatLine("user", "[Look at the attached screenshot (it is not kept) and dare the user, playfully, about what is really happening on their screen right now." + place + " Give ONE dare in one short sentence that begins with \"Dare you to\". It must be harmless, silly and quick (under a minute). Nothing dangerous, gross or illegal, nothing that hurts real people or touches their private things. Only use what you can really see; if you cannot tell, dare them about what they are doing instead.]");
+                sight.Images = new string[] { Convert.ToBase64String(picture) };
+                picture = null;
+                ask.Add(sight);
+                ShowCut("eyes", 5);
+            }
+            else ask.Add(new ChatLine("user", "[Dare the user, playfully." + place + " Give ONE new dare in one short sentence that begins with \"Dare you to\" and fits what they are doing. It must be harmless, silly and quick (under a minute) and doable at the computer or in the room. Nothing dangerous, gross, illegal, or about other people's private things, and nothing that puts your mouth on anything. For the kind of thing, but do not repeat these: " + seedA + " / " + seedB + "]"));
+            LlmLink link = llmLink;
+            string model = ActiveModel();
+            int attempt = llmAttempt;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string answer = "";
+                try { answer = Llm.Chat(link, model, ask); }
+                catch (Exception) { }
+                if (IsDisposed || !IsHandleCreated) return;
+                BeginInvoke((Action)delegate
+                {
+                    llmBusy = false;
+                    if (looked && cutin != null && cutin.Visible && cutin.Key == "eyes") cutin.Dismiss();
+                    if (attempt != llmAttempt) return;
+                    SayDare(Dares.Check(answer) ?? fallback, asked);
+                });
+            });
+        }
+
+        private void SayDare(string dare, bool asked)
+        {
+            dareOpenUntil = clock.Elapsed.TotalSeconds + 900;
+            if (asked) Reflect("dare me", dare);
+            else Say(dare, false, 0);
+        }
+
+        private void Remark(string kind, double pause, string[] lines, double now, params string[] values)
+        {
+            double last;
+            if (noticed.TryGetValue(kind, out last) && now - last < pause) return;
+            noticed[kind] = now;
+            noticeNext = now + 480 + chance.NextDouble() * 480;
+            Say(string.Format(Pick(lines), values), false, 0);
+        }
+
+        // ---- what she remembers: a plain text file you can read, edit or delete, one fact per line ----
+        private List<string> memory;
+        internal Action<string> Opener;
+        internal Action<byte> KeySender;
+        private static readonly string[] Noted = { "Noted! I never forget!", "Got it. Filed away!", "Mm-hm. I'll keep that!", "Written on my soul. Kidding!" };
+        private static readonly string[] Done = { "Done!", "Easy!", "Sure thing!", "On it!" };
+
+        internal string MemoryPath() { return Path.Combine(Path.GetDirectoryName(settingsPath), "memory.txt"); }
+
+        internal List<string> Memory()
+        {
+            if (memory != null) return memory;
+            memory = new List<string>();
+            try
+            {
+                if (File.Exists(MemoryPath()))
+                    foreach (string line in File.ReadAllLines(MemoryPath(), Encoding.UTF8))
+                        if (line.Trim().Length > 0 && memory.Count < 60) memory.Add(line.Trim());
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            return memory;
+        }
+
+        private void SaveMemory()
+        {
+            try { File.WriteAllLines(MemoryPath(), Memory().ToArray(), new UTF8Encoding(false)); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
+        internal bool Remember(string fact)
+        {
+            fact = Regex.Replace((fact ?? "").Trim().TrimEnd('.', '!', '?', ' '), @"\s+", " ");
+            if (fact.Length < 3) return false;
+            if (fact.Length > 200) fact = fact.Substring(0, 200);
+            List<string> facts = Memory();
+            foreach (string known in facts) if (string.Equals(known, fact, StringComparison.OrdinalIgnoreCase)) return true;
+            facts.Add(fact);
+            while (facts.Count > 60) facts.RemoveAt(0);
+            SaveMemory();
+            return true;
+        }
+
+        // How many notes were dropped: only a note that is the single match for these words is removed.
+        internal int Forget(string about)
+        {
+            List<string> facts = Memory();
+            List<string> keywords = new List<string>();
+            foreach (string word in Regex.Split(about.ToLowerInvariant(), @"[^a-z0-9']+"))
+                if (word.Length >= 3 && !Regex.IsMatch(word, @"^(?:the|and|from|your|you|memory|notes|brain|about|that|this|with|have|has|had|was|were|are|not|remove|forget|delete|erase|our)$")) keywords.Add(word);
+            List<string> hits = facts.FindAll(delegate(string fact)
+            {
+                if (keywords.Count == 0) return fact.IndexOf(about, StringComparison.OrdinalIgnoreCase) >= 0;
+                foreach (string word in keywords) if (fact.IndexOf(word, StringComparison.OrdinalIgnoreCase) < 0) return false;
+                return true;
+            });
+            if (hits.Count != 1) return hits.Count == 0 ? 0 : -hits.Count;
+            facts.Remove(hits[0]);
+            SaveMemory();
+            return 1;
+        }
+
+        internal void ForgetEverything()
+        {
+            Memory().Clear();
+            SaveMemory();
+        }
+
+        // Her personality for the model, with what she knows about you added when memory is on.
+        internal string BrainText()
+        {
+            string text = PersonaText() + "\n\nHOW CLOSE SHE IS TO THE USER RIGHT NOW (sync " + SyncPercent() + "%): " + SyncTier();
+            List<string> facts = Memory();
+            if (!preferences.MemoryOn || facts.Count == 0 || (llmLink != null && llmLink.Cloud && !preferences.CloudMemory)) return text;
+            StringBuilder block = new StringBuilder(text);
+            block.Append("\n\nWHAT THE USER HAS TOLD YOU (use one only when it really fits what they said; never list them or say you keep notes):");
+            for (int i = Math.Max(0, facts.Count - 25); i < facts.Count; i++) block.Append("\n- ").Append(facts[i]);
+            return block.ToString();
+        }
+
+        private void NoteName(string text)
+        {
+            if (!preferences.MemoryOn) return;
+            string name = Errands.Name(text);
+            if (name != null) Remember("their name is " + name);
+        }
+
+        private void Reflect(string said, string reply)
+        {
+            chatLog.Add(new ChatLine("user", said));
+            chatLog.Add(new ChatLine("assistant", reply));
+            while (chatLog.Count > 24) chatLog.RemoveAt(0);
+            Respond(reply);
+        }
+
+        private void Open(string target)
+        {
+            try
+            {
+                if (Opener != null) { Opener(target); return; }
+                ProcessStartInfo start = new ProcessStartInfo(target);
+                start.UseShellExecute = true;
+                Process.Start(start);
+            }
+            catch (Exception) { Respond("Hm, that won't open!"); }
+        }
+
+        private void Press(byte key, int times)
+        {
+            for (int i = 0; i < times; i++)
+            {
+                if (KeySender != null) KeySender(key); else Native.PressKey(key);
+            }
+        }
+
+        private static readonly Regex DareAsk = new Regex(@"^(?:dare me|dear me|give me a dare|i need a dare|dare me to something|i dare you|got any dares|dare)\b", RegexOptions.IgnoreCase);
+        private static readonly Regex DareDone = new Regex(@"^(?:done|i did it|did it|i'm done|finished|i did|ok i did|okay i did)\b", RegexOptions.IgnoreCase);
+
+        private bool TryDare(string said)
+        {
+            string text = (said ?? "").Trim().Trim('.', '!', '?', ' ');
+            text = Regex.Replace(text, @"^(?:hey |ok |okay )?(?:capri|cappy)[,!. ]+", "", RegexOptions.IgnoreCase);
+            if (DareAsk.IsMatch(text)) { GiveDare(true); return true; }
+            if (clock.Elapsed.TotalSeconds < dareOpenUntil && DareDone.IsMatch(text))
+            {
+                dareOpenUntil = 0;
+                preferences.DaresDone++;
+                AddSync(10, "dare");
+                SavePreferences();
+                Reflect(said, Pick(DoneLines));
+                return true;
+            }
+            return false;
+        }
+
+        private string lastCanon = "";
+
+        // One of her own lines for a question that has one. The same line twice in a row is left to the model.
+        private bool TryCanon(string said)
+        {
+            string line = Canon.Reply(said);
+            if (line == null || line == lastCanon) { lastCanon = ""; return false; }
+            lastCanon = line;
+            Reflect(said, line);
+            return true;
+        }
+
+        // ---- play a song on Spotify: open its search, find the Play button for it by name and press it ----
+        private bool spotifyBusy;
+
+        private Track ReadMedia()
+        {
+            try { return IsHandleCreated ? (Track)Invoke((Func<Track>)Media.Read) : null; }
+            catch (Exception) { return null; }
+        }
+
+        private void PlayOnSpotify(string query, string said)
+        {
+            if (spotifyBusy) { Reflect(said, "Still on the last one!"); return; }
+            Track before = null;
+            try { before = Media.Read(); } catch (Exception) { }
+            if (before != null && before.Playing && SpotifyUi.Score(before.Title + " " + before.Artist, query) >= 0.6) { Reflect(said, "That's already playing!"); return; }
+            Reflect(said, "Finding " + query + " on Spotify…");
+            string beforeKey = before != null && before.Playing ? before.Key : "";
+            try
+            {
+                if (Opener != null) Opener("spotify:search:" + Uri.EscapeDataString(query));
+                else { ProcessStartInfo start = new ProcessStartInfo("spotify:search:" + Uri.EscapeDataString(query)); start.UseShellExecute = true; Process.Start(start); }
+            }
+            catch (Exception) { Respond("I can't find Spotify on this PC."); return; }
+            spotifyBusy = true;
+            double limit = Math.Max(0.2, preferences.SpotifySeconds);
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string result = null;
+                int picked = -1;
+                bool seen = false;
+                string[] lastNames = null;
+                string lastVerb = null;
+                bool learnedNew = false;
+                for (double waited = 0; waited < limit && picked < 0; waited += SpotifyUi.Poll / 1000.0)
+                {
+                    string[] names = SpotifyUi.Buttons();
+                    if (names != null)
+                    {
+                        seen = true;
+                        lastNames = names;
+                        string verb = SpotifyUi.Choose(names, preferences.SpotifyVerb);
+                        lastVerb = verb;
+                        // Only a wording that many buttons share is remembered for next time.
+                        if (verb != null && verb != preferences.SpotifyVerb && SpotifyUi.Count(names, verb) >= 6) { preferences.SpotifyVerb = verb; learnedNew = true; }
+                        int index = verb == null ? -1 : SpotifyUi.Find(names, verb, query);
+                        if (index >= 0 && SpotifyUi.Invoke(index)) { picked = index; break; }
+                    }
+                    Thread.Sleep(SpotifyUi.Poll);
+                }
+                if (picked < 0 && lastNames != null) WriteSpotifyNote(query, lastVerb, lastNames);
+                if (learnedNew) { if (IsHandleCreated) BeginInvoke((Action)delegate { SavePreferences(); }); }
+                if (picked < 0) result = seen ? "I couldn't find " + query + " in Spotify's results." : "Spotify isn't open or won't let me in.";
+                else
+                {
+                    bool nudged = false;
+                    for (double waited = 0; waited < Math.Min(8, limit) && result == null; waited += SpotifyUi.Poll / 1000.0)
+                    {
+                        Thread.Sleep(SpotifyUi.Poll);
+                        Track now = ReadMedia();
+                        if (now != null && now.Playing && now.Key != beforeKey) result = "Playing " + Brief(now) + ".";
+                        // Pressing play on a result sometimes only selects it: if nothing is playing after a few seconds, the play key is pressed once.
+                        else if (!nudged && waited >= Math.Min(3.0, limit / 2)) { nudged = true; Press(0xB3, 1); }
+                    }
+                    if (result == null) result = "I pressed play on " + query + " but nothing started.";
+                }
+                if (IsDisposed || !IsHandleCreated) return;
+                BeginInvoke((Action)delegate { spotifyBusy = false; Respond(result); });
+            });
+        }
+
+        // What she saw in Spotify when she could not find the song, so it can be looked at: the names of its buttons and the Play wording she used.
+        private void WriteSpotifyNote(string query, string verb, string[] names)
+        {
+            try
+            {
+                List<string> lines = new List<string>();
+                lines.Add("Looking for: " + query);
+                lines.Add("Play wording used: " + (verb ?? "(none found)"));
+                lines.Add("Buttons seen (" + names.Length + "):");
+                foreach (string name in names) lines.Add("  " + name);
+                File.WriteAllLines(Path.Combine(Path.GetDirectoryName(settingsPath), "spotify-buttons.txt"), lines.ToArray(), new UTF8Encoding(false));
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
+        // "Play it on YouTube": the first video for the search is opened itself. One request goes to youtube.com for this, nothing else.
+        private void PlayOnYouTube(string query, string search, string said)
+        {
+            Reflect(said, "Finding " + query + " on YouTube…");
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string id = YouTube.FirstVideo(YouTube.Fetch(query));
+                if (IsDisposed || !IsHandleCreated) return;
+                BeginInvoke((Action)delegate
+                {
+                    Open(id != null ? "https://www.youtube.com/watch?v=" + id : search);
+                    Respond(id != null ? "Playing " + query + "!" : "I couldn't pick one, so here are the results.");
+                });
+            });
+        }
+
+        // The small things she can do without asking a model. Returns false when the words were not a request, so they go to the model as usual.
+        internal bool TryErrand(string said)
+        {
+            Errand errand = Errands.Parse(said);
+            switch (errand.Kind)
+            {
+                case ErrandKind.None: return false;
+                case ErrandKind.Remember:
+                    if (!preferences.MemoryOn) { Reflect(said, "My memory's switched off! Chat, Memory."); return true; }
+                    if (Errands.Sensitive(errand.Text)) { Reflect(said, "Not that one! Passwords belong in a password manager."); return true; }
+                    Reflect(said, Remember(errand.Text) ? Pick(Noted) + " (" + errand.Text.TrimEnd('.', '!', '?') + ")" : "Hm, say that again?");
+                    return true;
+                case ErrandKind.Forget:
+                    int dropped = Forget(errand.Text);
+                    Reflect(said, dropped == 1 ? "Forgotten! Convenient, huh?" : dropped == 0 ? "I don't have anything like that!" : "That's " + (-dropped) + " things! Be more specific.");
+                    return true;
+                case ErrandKind.ForgetAll:
+                    ForgetEverything();
+                    Reflect(said, "Everything about you? Gone! Hi, I'm Capri!");
+                    return true;
+                case ErrandKind.Timer:
+                    if (AddAlarm(DateTime.Now.AddSeconds(errand.Seconds), errand.Text.Length > 0 ? errand.Text : "Timer: " + Errands.Describe(errand.Seconds), false)) Reflect(said, "Timer's on for " + Errands.Describe(errand.Seconds) + (errand.Text.Length > 0 ? ": " + errand.Text : "") + "!");
+                    else Reflect(said, "That's plenty of alarms already!");
+                    return true;
+                case ErrandKind.Clock:
+                    if (AddAlarm(errand.Due, errand.Text, false)) Reflect(said, "Alarm's set for " + errand.Due.ToString("HH:mm") + "!");
+                    else Reflect(said, "That's plenty of alarms already!");
+                    return true;
+                case ErrandKind.ClearAlarms:
+                    preferences.Alarms.Clear();
+                    SavePreferences();
+                    RebuildAlarms();
+                    Reflect(said, "All cleared!");
+                    return true;
+                case ErrandKind.Study:
+                    StartStudy((int)(errand.Seconds / 60), 5);
+                    Reflect(said, "Focus time! " + (int)(errand.Seconds / 60) + " minutes. I'll keep quiet!");
+                    return true;
+                case ErrandKind.StopStudy:
+                    if (study == StudyPhase.Off) { Reflect(said, "We're not studying!"); return true; }
+                    StopStudy();
+                    Reflect(said, "Ok, stopped!");
+                    return true;
+                case ErrandKind.Web:
+                    Open(errand.Target);
+                    Reflect(said, "Looking up " + errand.Text + "!");
+                    return true;
+                case ErrandKind.PlaySong:
+                    PlayOnSpotify(errand.Text, said);
+                    return true;
+                case ErrandKind.PlayVideo:
+                    PlayOnYouTube(errand.Text, errand.Target, said);
+                    return true;
+                case ErrandKind.Open:
+                    Open(errand.Target);
+                    Reflect(said, errand.More ? "Opened " + errand.Text + ". The rest I can't do yet." : Pick(Done));
+                    return true;
+                case ErrandKind.Pause:
+                case ErrandKind.Play:
+                    Track now = null;
+                    try { now = Media.Read(); } catch (Exception) { }
+                    if (errand.Kind == ErrandKind.Pause && (now == null || !now.Playing)) { Reflect(said, "Nothing's playing!"); return true; }
+                    if (errand.Kind == ErrandKind.Play && now != null && now.Playing) { Reflect(said, "It's already playing!"); return true; }
+                    Press(0xB3, 1);
+                    Reflect(said, Pick(Done));
+                    return true;
+                case ErrandKind.Next:
+                    Press(0xB0, 1);
+                    Reflect(said, "Skipped!");
+                    return true;
+                case ErrandKind.Previous:
+                    Press(0xB1, 1);
+                    Reflect(said, "Back we go!");
+                    return true;
+                case ErrandKind.Mute:
+                    Press(0xAD, 1);
+                    Reflect(said, Pick(Done));
+                    return true;
+                case ErrandKind.Volume:
+                    Press(errand.Up ? (byte)0xAF : (byte)0xAE, errand.Presses);
+                    Reflect(said, errand.Up ? "Louder!" : "Quieter!");
+                    return true;
+            }
+            return false;
         }
 
         internal void Converse(string text)
@@ -1721,7 +2463,7 @@ namespace CapriDesktop
             chatLog.Add(said);
             while (chatLog.Count > 24) chatLog.RemoveAt(0);
             List<ChatLine> sent = new List<ChatLine>(chatLog);
-            sent.Insert(0, new ChatLine("system", PersonaText()));
+            sent.Insert(0, new ChatLine("system", BrainText()));
             LlmLink link = llmLink;
             string model = ActiveModel();
             int attempt = llmAttempt;
@@ -1742,9 +2484,10 @@ namespace CapriDesktop
                     if (failed || answer.Length == 0)
                     {
                         chatLog.Remove(said);
-                        Respond(failed ? "I can't reach my brain! Is the model still running?" : "Hm, I lost my train of thought!");
+                        Respond(link.Cloud ? "Cloud trouble: " + Cloud.LastError + ". Chat, Cloud model settings to change it." : failed ? "I can't reach my brain! Is the model still running?" : "Hm, I lost my train of thought!");
                         return;
                     }
+                    answer = Llm.Shape(answer, chance);
                     chatLog.Add(new ChatLine("assistant", answer));
                     while (chatLog.Count > 24) chatLog.RemoveAt(0);
                     Respond(answer);
@@ -1810,7 +2553,7 @@ namespace CapriDesktop
 
         private void Play(Behavior which, bool manual)
         {
-            if (hidden || riding || dragging || !IsHandleCreated) return;
+            if (hidden || riding || dragging || !IsHandleCreated || (!manual && menu.Visible)) return;
             if (behavior == Behavior.Peek || behavior == Behavior.Sit) StopBehavior();
             bool placed = sitChosen;
             if (which == Behavior.Sit && !placed && !FindSill())
@@ -1865,7 +2608,8 @@ namespace CapriDesktop
             glitchQuiet = false;
             glitchManual = manual;
             glitchNoted = false;
-            int kind = glitchKindNext >= 0 ? glitchKindNext : chance.Next(Glitch.Kinds.Length);
+            int kind = glitchKindNext >= 0 ? glitchKindNext : PickKind();
+            Glitch.SyncTarget = Math.Max(0.02, SyncPercent() / 100.0);
             glitchKindNext = -1;
             glitchLength = Glitch.Seconds[kind];
             ArmEscape();
@@ -2457,6 +3201,10 @@ namespace CapriDesktop
             internal bool Broken;
             internal bool NoOllama;
             internal string LastPath = "";
+            internal string LastAuth = "";
+            internal string LastVersion = "";
+            internal int ForceStatus;
+            internal bool EmptyAnswer;
 
             internal FakeServer()
             {
@@ -2481,15 +3229,19 @@ namespace CapriDesktop
                 string path = context.Request.Url.AbsolutePath;
                 bool models = path == "/v1/models";
                 bool version = path == "/api/version";
-                if (!models && !version) { LastBody = body; LastPath = path; }
+                if (!models && !version) { LastBody = body; LastPath = path; LastAuth = context.Request.Headers["Authorization"] ?? context.Request.Headers["x-api-key"] ?? ""; LastVersion = context.Request.Headers["anthropic-version"] ?? ""; }
                 Interlocked.Increment(ref Hits);
                 string answer = models
                     ? "{\"object\":\"list\",\"data\":[{\"id\":\"fake-small\"},{\"id\":\"fake-big\"}]}"
                     : version ? "{\"version\":\"0.0.0\"}"
+                    : path == "/v1/messages" ? "{\"content\":[{\"type\":\"text\",\"text\":\"Hello from the fake claude.\"}]}"
                     : path == "/api/chat" ? "{\"message\":{\"role\":\"assistant\",\"content\":\"<think>hmm</think>  Hello   from the fake model.\"}}"
                     : "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"<think>hmm</think>  Hello   from the fake model.\"}}]}";
                 byte[] bytes = Encoding.UTF8.GetBytes(answer);
+                if (EmptyAnswer && path == "/v1/chat/completions") answer = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"\"}}]}";
+                bytes = Encoding.UTF8.GetBytes(answer);
                 if (Broken && !models && !version) context.Response.StatusCode = 500;
+                if (ForceStatus != 0 && !models && !version) context.Response.StatusCode = ForceStatus;
                 if (NoOllama && (version || path == "/api/chat")) context.Response.StatusCode = 404;
                 context.Response.ContentType = "application/json";
                 context.Response.OutputStream.Write(bytes, 0, bytes.Length);
@@ -2566,6 +3318,7 @@ namespace CapriDesktop
                         }
                         else if (step == 1)
                         {
+                            for (int wait = 0; wait < 150 && (!Visible || hidden); wait++) { Application.DoEvents(); Thread.Sleep(20); }
                             if (!Visible || hidden) throw new Exception("Second-launch restore signal did not show Capri.");
                             checks.Add("PASS restore signal");
                             Point bounded = KeepOnScreen(new Point(int.MaxValue / 4, int.MaxValue / 4));
@@ -2922,6 +3675,9 @@ namespace CapriDesktop
                                 if (!waitFor(delegate { return !llmBusy && chatLog.Count == quietLog + 2; })) throw new Exception("Something said with the chat closed was not answered.");
                                 if (ChatOpen() || ear.Listening || chatLog[quietLog].Content != "Hello without a window" || bubble == null || !bubble.Visible) throw new Exception("A spoken conversation did not stay in bubbles.");
                                 checks.Add("PASS the microphone talks to her without opening the chat window: she answers in a bubble");
+                                foreach (string lookPhrase in new string[] { "what should I do in this situation", "Capri, what weapon should I buy", "what team should i pick", "what should I pick here", "what do I do next in this round" })
+                                    if (!WantsLook(lookPhrase)) throw new Exception("A question about what she can see was not taken as a look: " + lookPhrase);
+                                if (WantsLook("what should I eat tonight") || WantsLook("what do you think about humans") || WantsLook("what should I name my dog")) throw new Exception("An ordinary question was taken as a look.");
                                 if (!WantsLook("Capri, look at my screen") || !WantsLook("what am I watching?") || WantsLook("hello there") || WantsLook("I am watching you")) throw new Exception("Asking her to look was not told apart from ordinary chat.");
                                 byte[] realShot = Snapshot();
                                 if (realShot.Length < 2000 || realShot[0] != 0xFF || realShot[1] != 0xD8) throw new Exception("The real screen grab did not produce a picture.");
@@ -2939,6 +3695,488 @@ namespace CapriDesktop
                                 preferences.LookOn = true;
                                 ScreenSource = null;
                                 checks.Add("PASS asking her to look sends one picture to the model with the question, keeps nothing of it, and does nothing when switched off");
+                                string[][] errandPhrases = new string[][] {
+                                    new string[] { "set a timer for 10 minutes", "Timer" }, new string[] { "Capri, can you remind me in 20 minutes to stretch?", "Timer" }, new string[] { "timer 30 seconds", "Timer" },
+                                    new string[] { "set a timer for half an hour please", "Timer" }, new string[] { "set an alarm for 7:30 pm", "Clock" }, new string[] { "wake me at 6am", "Clock" },
+                                    new string[] { "open downloads", "Open" }, new string[] { "open my documents folder", "Open" }, new string[] { "hey capri open the calculator", "Open" },
+                                    new string[] { "pause the music", "Pause" }, new string[] { "pause", "Pause" }, new string[] { "resume", "Play" }, new string[] { "play the music", "Play" },
+                                    new string[] { "skip", "Next" }, new string[] { "next song", "Next" }, new string[] { "previous song", "Previous" }, new string[] { "mute", "Mute" },
+                                    new string[] { "turn it up", "Volume" }, new string[] { "turn the volume down", "Volume" }, new string[] { "volume up", "Volume" },
+                                    new string[] { "remember that my dog is called Bo", "Remember" }, new string[] { "forget about my dog", "Forget" }, new string[] { "forget everything", "ForgetAll" },
+                                    new string[] { "start a study session for 50 minutes", "Study" }, new string[] { "stop studying", "StopStudy" }, new string[] { "cancel my alarms", "ClearAlarms" },
+                                    new string[] { "open your heart", "None" }, new string[] { "forget it", "None" }, new string[] { "remember when we met?", "None" }, new string[] { "I set a timer for 5 minutes yesterday", "None" },
+                                    new string[] { "what is a timer for", "None" }, new string[] { "play", "None" }, new string[] { "turn up the heat", "None" }, new string[] { "how are you today", "None" }, new string[] { "open the pod bay doors", "None" } };
+                                foreach (string[] row in errandPhrases)
+                                    if (Errands.Parse(row[0]).Kind.ToString() != row[1]) throw new Exception("\"" + row[0] + "\" was read as " + Errands.Parse(row[0]).Kind + " instead of " + row[1] + ".");
+                                if (Errands.Length("in 90 seconds") != 90 || Errands.Length("for an hour") != 3600 || Errands.Length("hello") != 0) throw new Exception("Lengths of time were not read correctly.");
+                                DateTime noon = new DateTime(2026, 1, 1, 12, 0, 0);
+                                if (Errands.NextClock(7, 30, "p", noon) != new DateTime(2026, 1, 1, 19, 30, 0) || Errands.NextClock(6, 0, "a", noon) != new DateTime(2026, 1, 2, 6, 0, 0) || Errands.NextClock(7, 0, "", noon) != new DateTime(2026, 1, 1, 19, 0, 0)) throw new Exception("Clock times were not read correctly.");
+                                string[] startMenu = new string[] { @"C:\Menu\Discord Inc\Discord.lnk", @"C:\Menu\Microsoft Edge.lnk", @"C:\Menu\Uninstall Foo.lnk", @"C:\Menu\Google Chrome.lnk", @"C:\Menu\Steam\Steam.lnk", @"C:\Menu\Steam\Steam Support Center.lnk", @"C:\Menu\Visual Studio Code\Visual Studio Code.lnk" };
+                                if (Errands.Match("discord", startMenu) != startMenu[0] || Errands.Match("edge", startMenu) != startMenu[1] || Errands.Match("chrome", startMenu) != startMenu[3] || Errands.Match("steam", startMenu) != startMenu[4] || Errands.Match("vscode", startMenu) != startMenu[6] || Errands.Match("uninstall foo", startMenu) != null || Errands.Match("pod bay doors", startMenu) != null) throw new Exception("Installed programs were not found by name.");
+                                Func<string, string> realLookup = Errands.AppLookup;
+                                Errands.AppLookup = delegate(string name) { return Errands.Match(name, startMenu); };
+                                if (!Errands.Parse("open downloads and make an empty txt file called RIP John").More || Errands.Parse("open downloads and make an empty txt file called RIP John").Text != "downloads" || Errands.Parse("open downloads").More) throw new Exception("Opening something and then asking for more was not understood.");
+                                if (Errands.Parse("open Discord").Kind != ErrandKind.Open || Errands.Parse("open Discord").Target != startMenu[0] || Errands.Parse("open edge").Kind != ErrandKind.Open || Errands.Parse("open your heart").Kind != ErrandKind.None) throw new Exception("Opening a program by name was not understood.");
+                                Errands.AppLookup = realLookup;
+                                if (Errands.Parse("remember, I have a cat called John").Text != "I have a cat called John" || Errands.Parse("Please remember that I have a cat called John.").Kind != ErrandKind.Remember || Errands.Parse("don't forget my birthday is in May").Kind != ErrandKind.Remember) throw new Exception("Ways of saying remember were not understood.");
+                                if (Errands.Parse("Remove my cat, John, from your memory").Kind != ErrandKind.Forget || Errands.Parse("forget my cat").Kind != ErrandKind.Forget || Errands.Parse("forget about the cat").Kind != ErrandKind.Forget || Errands.Parse("forget it").Kind != ErrandKind.None || Errands.Parse("forget you").Kind != ErrandKind.None) throw new Exception("Ways of saying forget were not understood.");
+                                string opened = null;
+                                System.Collections.Generic.List<byte> pressed = new System.Collections.Generic.List<byte>();
+                                Opener = delegate(string target) { opened = target; };
+                                KeySender = delegate(byte key) { pressed.Add(key); };
+                                preferences.Alarms.Clear();
+                                OnChatSent("set a timer for 10 minutes");
+                                if (preferences.Alarms.Count != 1 || Math.Abs((new DateTime(preferences.Alarms[0].Due, DateTimeKind.Utc) - DateTime.UtcNow).TotalMinutes - 10) > 0.5) throw new Exception("A spoken timer was not set.");
+                                OnChatSent("open downloads");
+                                if (opened == null || !opened.EndsWith("Downloads")) throw new Exception("A folder she was asked to open was not opened.");
+                                Media.Source = delegate { Track errandTrack = new Track(); errandTrack.Title = "x"; errandTrack.Playing = false; return errandTrack; };
+                                OnChatSent("pause the music");
+                                if (pressed.Count != 0) throw new Exception("She paused something that was not playing.");
+                                Media.Source = delegate { Track errandTrack = new Track(); errandTrack.Title = "x"; errandTrack.Playing = true; return errandTrack; };
+                                OnChatSent("pause the music");
+                                OnChatSent("turn it up");
+                                OnChatSent("skip");
+                                Media.Source = null;
+                                if (pressed.Count != 7 || pressed[0] != 0xB3 || pressed[1] != 0xAF || pressed[5] != 0xAF || pressed[6] != 0xB0) throw new Exception("Media and volume keys were not pressed as asked.");
+                                int hitsBefore = server.Hits;
+                                OnChatSent("open your heart");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > hitsBefore; })) throw new Exception("Something that is not an errand was not passed on to the model.");
+                                preferences.Alarms.Clear();
+                                RebuildAlarms();
+                                Opener = null;
+                                KeySender = null;
+                                Random habitDice = new Random(7);
+                                int choomLeft = 0, questionsLeft = 0;
+                                for (int round = 0; round < 200; round++)
+                                {
+                                    string said = Llm.Shape("C'mon, let's go. Anytime, choom! What now?", habitDice);
+                                    if (said.IndexOf("choom", StringComparison.OrdinalIgnoreCase) >= 0) choomLeft++;
+                                    if (said.EndsWith("?")) questionsLeft++;
+                                    if (said.Length == 0 || said.StartsWith(" ") || said.IndexOf(" !") >= 0 || (char.IsLetter(said[0]) && char.IsLower(said[0]))) throw new Exception("A trimmed reply was left untidy: " + said);
+                                }
+                                if (choomLeft < 10 || choomLeft > 80 || questionsLeft < 50 || questionsLeft > 130) throw new Exception("Her habits were not trimmed to a sensible share: choom " + choomLeft + ", questions " + questionsLeft + " of 200.");
+                                if (Llm.Shape("Hello there.", habitDice) != "Hello there." || Llm.Shape("What?", habitDice) != "What?" || Llm.Shape("", habitDice) != "") throw new Exception("A short reply was changed.");
+                                if (Llm.DefaultPersona.IndexOf("Capri") < 0 || Llm.DefaultPersona.Length < 600) throw new Exception("Her built-in persona file was not embedded.");
+                                string[][] canonTable = new string[][] {
+                                    new string[] { "Who are you?", "Me? I'm Capri!" },
+                                    new string[] { "Capri, what are you?", "A personality construct. Digitized human souls. A whole lot of 'em rolled into one to make me." },
+                                    new string[] { "are you an AI?", "Not exactly. I was made to reach something close. I was human once." }, new string[] { "why should I trust you", "Come on, let's be friends." },
+                                    new string[] { "Are you dangerous?", "Dangerous? Me? I'm harmless!" }, new string[] { "are you trying to take over my pc", "Just 'cause I tried doesn't mean I actually did. For now..." },
+                                    new string[] { "I don't like you", "You don't have to lie." }, new string[] { "thanks capri", "Anytime!" } };
+                                foreach (string[] row in canonTable)
+                                    if (Canon.Reply(row[0]) != row[1]) throw new Exception("\"" + row[0] + "\" got " + (Canon.Reply(row[0]) ?? "nothing") + " instead of her own line.");
+                                foreach (string other in new string[] { "hi", "Hey Capri!", "Hey you!", "Are you a boy or a girl?", "how are you", "who are you going to vote for", "what are you doing", "I'm bored", "tell me about you and your friends in the other room" })
+                                    if (Canon.Reply(other) != null) throw new Exception("\"" + other + "\" was answered with a canned line.");
+                                lastCanon = "";
+                                OnChatSent("who are you?");
+                                if (chatLog.Count < 2 || chatLog[chatLog.Count - 1].Content != "Me? I'm Capri!") throw new Exception("Her own line was not used for a question that has one.");
+                                int canonHits = server.Hits;
+                                OnChatSent("who are you?");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > canonHits; })) throw new Exception("The same line twice in a row was not left to the model.");
+                                lastCanon = "";
+                                if (bubble != null) bubble.Dismiss();
+                                Senses.Idle = delegate { return 1; };
+                                Senses.Cpu = delegate { return 10; };
+                                Senses.Battery = delegate { return -1; };
+                                Senses.App = delegate { return "chrome"; };
+                                Senses.Now = delegate { return new DateTime(2026, 1, 1, 15, 0, 0); };
+                                Action<string, string> noticeOnce = delegate(string what, string wanted)
+                                {
+                                    if (bubble != null) bubble.Dismiss();
+                                    lastSaid = -100;
+                                    lastObserve = -100;
+                                    noticeNext = 0;
+                                    Observe();
+                                    if (bubble == null || !bubble.Visible) throw new Exception("She said nothing about: " + what);
+                                    if (bubble.Message.IndexOf(wanted) < 0) throw new Exception("She noticed " + what + " but said: " + bubble.Message);
+                                    bubble.Dismiss();
+                                };
+                                bool noticeSetting = preferences.Notices;
+                                preferences.Notices = true;
+                                noticed.Clear();
+                                Observe();
+                                if (bubble != null && bubble.Visible) throw new Exception("She spoke up with nothing to notice.");
+                                wasAway = true; peakIdle = 1800;
+                                noticeOnce("you coming back", "");
+                                Senses.Now = delegate { return new DateTime(2026, 1, 1, 3, 15, 0); };
+                                noticeOnce("it being late", "3:15 am");
+                                Senses.Now = delegate { return new DateTime(2026, 1, 1, 15, 0, 0); };
+                                Senses.Battery = delegate { return 14; };
+                                noticeOnce("a low battery", "14%");
+                                Senses.Battery = delegate { return -1; };
+                                cpuBusy = 40; Senses.Cpu = delegate { return 96; };
+                                noticeOnce("a busy computer", "96%");
+                                Senses.Cpu = delegate { return 10; };
+                                cpuBusy = 0;
+                                frontSince = clock.Elapsed.TotalSeconds - 7300;
+                                noticeOnce("a long time in one program", "Chrome");
+                                lastSaid = -100; lastObserve = -100; noticeNext = 0;
+                                Observe();
+                                if (bubble != null && bubble.Visible) throw new Exception("She repeated a remark before its pause was over.");
+                                noticed.Clear();
+                                preferences.Notices = false;
+                                Senses.Battery = delegate { return 9; };
+                                lastObserve = -100; noticeNext = 0;
+                                Observe();
+                                if (bubble != null && bubble.Visible) throw new Exception("She spoke up with noticing switched off.");
+                                preferences.Notices = noticeSetting;
+                                Senses.Idle = Native.IdleSeconds; Senses.Cpu = Senses.SystemCpu; Senses.Battery = Senses.OnBattery; Senses.App = Native.FrontApp; Senses.Now = delegate { return DateTime.Now; };
+                                if (Native.IdleSeconds() < 0 || Native.IdleSeconds() > 86400 * 30) throw new Exception("The idle time could not be read.");
+                                if (Senses.Friendly("msedge") != "Edge" || Senses.Friendly("discord") != "Discord") throw new Exception("Program names were not made readable.");
+                                noticed.Clear();
+                                noticeNext = double.MaxValue;
+                                if (Dares.Check("Dare you to close every tab except one.") == null || Dares.Check("Hello there, how are you today friend?") != null || Dares.Check("Dare you to hurt someone.") != null || Dares.Check("Dare you to " + new string('x', 200)) != null) throw new Exception("A dare from the model was not checked properly.");
+                                if (Dares.Category("chrome") != "browser" || Dares.Category("Discord") != "chat" || Dares.Category("code") != "code" || Dares.Category("unknown") != "any") throw new Exception("Programs were not sorted into kinds of dare.");
+                                foreach (string kind in new string[] { "browser", "chat", "code", "media", "docs", "any" })
+                                    foreach (string line in Dares.Pool(kind)) if (Dares.Check(line) == null) throw new Exception("One of her own dares would be refused: " + line);
+                                bool llmWas = preferences.LlmOn;
+                                preferences.LlmOn = false;
+                                if (bubble != null) bubble.Dismiss();
+                                lastSaid = -100; lastObserve = -100; noticeNext = 0; dareNext = 0;
+                                Senses.Idle = delegate { return 1; }; Senses.Cpu = delegate { return 10; }; Senses.Battery = delegate { return -1; };
+                                Senses.App = delegate { return "chrome"; }; Senses.Now = delegate { return new DateTime(2026, 1, 1, 15, 0, 0); };
+                                preferences.Notices = true; preferences.Dares = true;
+                                noticed.Clear();
+                                frontApp = ""; frontRaw = "";
+                                Observe();
+                                frontSince = clock.Elapsed.TotalSeconds - 700;
+                                lastObserve = -100; noticeNext = 0; dareNext = 0; lastSaid = -100;
+                                if (bubble != null) bubble.Dismiss();
+                                Observe();
+                                if (bubble == null || !bubble.Visible || bubble.Message.IndexOf("Dare you to") != 0 || Array.IndexOf(Dares.Pool("browser"), bubble.Message) < 0) throw new Exception("An automatic dare for a browser did not appear. bubble=" + (bubble == null ? "null" : bubble.Visible + "/" + bubble.Message) + " behavior=" + behavior + " chat=" + ChatOpen() + " hidden=" + hidden + " fs=" + fullscreenAway + " riding=" + riding + " dragging=" + dragging + " study=" + study + " frontRaw=" + frontRaw + " since=" + (clock.Elapsed.TotalSeconds - frontSince));
+                                bubble.Dismiss();
+                                int doneBefore = preferences.DaresDone;
+                                OnChatSent("done");
+                                if (preferences.DaresDone != doneBefore + 1) throw new Exception("Finishing a dare was not counted.");
+                                OnChatSent("done");
+                                if (preferences.DaresDone != doneBefore + 1) throw new Exception("A dare was counted twice.");
+                                preferences.Dares = false;
+                                frontSince = clock.Elapsed.TotalSeconds - 700;
+                                lastObserve = -100; noticeNext = 0; dareNext = 0;
+                                if (bubble != null) bubble.Dismiss();
+                                Observe();
+                                if (bubble != null && bubble.Visible) throw new Exception("She dared me with dares switched off.");
+                                preferences.Dares = true;
+                                lastSaid = -100;
+                                OnChatSent("dare me");
+                                if (chatLog[chatLog.Count - 1].Content.IndexOf("Dare you to") != 0) throw new Exception("Asking for a dare did not get one.");
+                                OnChatSent("Dear me!");
+                                if (chatLog[chatLog.Count - 1].Content.IndexOf("Dare you to") != 0) throw new Exception("A misheard 'dare me' did not get a dare.");
+                                foreach (string unsafeDare in new string[] { "Dare you to jump out the window.", "Dare you to jump off the roof.", "Dare you to light a cigarette.", "Dare you to hit yourself.", "Dare you to drink a beer.", "Dare you to kill your neighbour." })
+                                    if (Dares.Check(unsafeDare) != null) throw new Exception("An unsafe dare was accepted: " + unsafeDare);
+                                foreach (string fineDare in new string[] { "Dare you to close every window except one.", "Dare you to stop peeking at the score tab and shoot something.", "Dare you to jump into the next round.", "Dare you to rush the site and get blown up before the timer hits zero.", "Dare you to jump off the ledge on this map.", "Dare you to kill the whole enemy team with the knife." })
+                                    if (Dares.Check(fineDare) == null) throw new Exception("A harmless dare was refused: " + fineDare);
+                                preferences.LlmOn = llmWas;
+                                Senses.Idle = Native.IdleSeconds; Senses.Cpu = Senses.SystemCpu; Senses.Battery = Senses.OnBattery; Senses.App = Native.FrontApp; Senses.Now = delegate { return DateTime.Now; };
+                                dareNext = double.MaxValue; noticeNext = double.MaxValue; dareOpenUntil = 0;
+                                preferences.SyncPoints = 0; preferences.SyncShown = 0; preferences.SyncDay = ""; preferences.SyncMinutes = 0; preferences.SyncChats = 0; preferences.SyncPats = 0;
+                                Senses.Now = delegate { return new DateTime(2026, 1, 1, 15, 0, 0); };
+                                if (bubble != null) bubble.Dismiss();
+                                lastSaid = -100;
+                                for (int i = 0; i < 40; i++) AddSync(2, "chat");
+                                if (preferences.SyncPoints != 20 || preferences.SyncChats != 10) throw new Exception("The daily limit on chatting was not kept: " + preferences.SyncPoints);
+                                for (int i = 0; i < 40; i++) AddSync(1, "time");
+                                for (int i = 0; i < 40; i++) AddSync(1, "pat");
+                                if (preferences.SyncPoints != 20 + 24 + 10) throw new Exception("The daily limits on time and pats were not kept: " + preferences.SyncPoints);
+                                Senses.Now = delegate { return new DateTime(2026, 1, 2, 15, 0, 0); };
+                                AddSync(2, "chat");
+                                if (preferences.SyncPoints != 56 || preferences.SyncChats != 1) throw new Exception("A new day did not reset the limits.");
+                                preferences.SyncPoints = 95; preferences.SyncShown = 0;
+                                lastSaid = -100;
+                                AddSync(10, "dare");
+                                if (preferences.SyncPoints != 105 || preferences.SyncShown != 1 || bubble == null || !bubble.Visible || bubble.Message.IndexOf("SYNC 10%") < 0 || bubble.Message.IndexOf("TEAR") < 0) throw new Exception("Reaching 10% was not announced with what it unlocks.");
+                                bubble.Dismiss();
+                                preferences.SyncPoints = 0;
+                                for (int i = 0; i < 100; i++) if (PickKind() != 0) throw new Exception("A glitch style was used before it was unlocked.");
+                                preferences.SyncPoints = 1000;
+                                bool[] seenKinds = new bool[Glitch.Kinds.Length];
+                                for (int i = 0; i < 300; i++) seenKinds[PickKind()] = true;
+                                foreach (bool seenKind in seenKinds) if (!seenKind) throw new Exception("Not every glitch style opens up at full sync.");
+                                preferences.SyncPoints = 400;
+                                if (!BrainText().Contains("sync 40%") || BrainText().IndexOf("teases") < 0) throw new Exception("The model was not told how close she is.");
+                                lastSaid = -100;
+                                OnChatSent("how's our sync?");
+                                if (chatLog[chatLog.Count - 1].Content.IndexOf("40%") < 0) throw new Exception("Asking about sync did not give the number.");
+                                glitchKindNext = 4;
+                                glitchQuiet = true;
+                                Play(Behavior.Glitch, true);
+                                if (Math.Abs(Glitch.SyncTarget - 0.4) > 0.001) throw new Exception("The sync box did not show the real number.");
+                                StopBehavior();
+                                Glitch.SyncTarget = 0.87;
+                                glitchLength = 2.6;
+                                preferences.SyncPoints = 0; preferences.SyncShown = 0; preferences.SyncDay = "";
+                                Senses.Now = delegate { return DateTime.Now; };
+                                checks.Add("PASS sync grows from time, chatting, pats and dares within daily limits, announces each ten percent, opens up glitch styles, tells the model how close she is and shows the real number in her sync box");
+                                checks.Add("PASS she dares you for what you are doing (the model's dare is checked, her own list is the fallback), counts finished dares once, and can be asked or switched off");
+                                Cloud.AllowPlainLocal = true;
+                                Cloud.TestBase = "http://localhost:" + server.Port + "/v1";
+                                Cloud.ClearKey();
+                                if (Cloud.HasKey()) throw new Exception("A key was left over from before.");
+                                Cloud.SaveKey("sk-test-123");
+                                if (!Cloud.HasKey() || File.ReadAllText(Cloud.KeyPath).IndexOf("sk-test") >= 0 || Cloud.LoadKey() != "sk-test-123") throw new Exception("The key was not kept encrypted and readable by this user.");
+                                System.Collections.Generic.List<ChatLine> cloudSample = new System.Collections.Generic.List<ChatLine>();
+                                cloudSample.Add(new ChatLine("system", "be capri \"quoted\""));
+                                cloudSample.Add(new ChatLine("user", "hi\nthere"));
+                                cloudSample.Add(new ChatLine("user", "again"));
+                                ChatLine cloudPicture = new ChatLine("user", "look");
+                                cloudPicture.Images = new string[] { "QUJD" };
+                                cloudSample.Add(cloudPicture);
+                                string openBody = Cloud.OpenAiBody("openrouter", "m1", cloudSample);
+                                if (openBody.IndexOf("\"image_url\"") < 0 || openBody.IndexOf("data:image/jpeg;base64,QUJD") < 0 || openBody.IndexOf("\\\"quoted\\\"") < 0 || openBody.IndexOf("hi\\nthere") < 0 || openBody.IndexOf("\"max_tokens\"") < 0) throw new Exception("The OpenAI-style request was not built correctly: " + openBody);
+                                if (Cloud.OpenAiBody("openai", "m1", cloudSample).IndexOf("max_completion_tokens") < 0 || Cloud.OpenAiBody("openai", "m1", cloudSample).IndexOf("temperature") >= 0) throw new Exception("The OpenAI request did not use its own limits.");
+                                string claudeBody = Cloud.AnthropicBody("m1", cloudSample);
+                                if (claudeBody.IndexOf("\"system\":\"be capri \\\"quoted\\\"\"") < 0 || claudeBody.IndexOf("\"type\":\"image\"") < 0 || claudeBody.IndexOf("\"media_type\":\"image/jpeg\"") < 0 || claudeBody.IndexOf("hi\\nthere\\nagain") < 0) throw new Exception("The Anthropic request was not built correctly: " + claudeBody);
+                                if (!Cloud.UrlOk("https://example.com/v1") || !Cloud.UrlOk("http://localhost:1/v1") || Cloud.UrlOk("ftp://example.com") || Cloud.UrlOk("not a url")) throw new Exception("Cloud addresses were not checked.");
+                                Cloud.AllowPlainLocal = false;
+                                if (Cloud.UrlOk("http://localhost:1/v1") || Cloud.UrlOk("http://example.com/v1")) throw new Exception("A plain address was accepted outside testing.");
+                                Cloud.AllowPlainLocal = true;
+
+                                bool lookWas = preferences.CloudLook;
+                                preferences.LlmOn = true;
+                                preferences.MemoryOn = true;
+                                preferences.CloudMemory = false;
+                                ApplyCloud("custom", "cloud-test", "http://localhost:" + server.Port + "/v1", "sk-test-123", false, false, false);
+                                if (llmLink == null || !llmLink.Cloud || !preferences.CloudOn || !llmStatus.StartsWith("Cloud:")) throw new Exception("Switching to the cloud model did not connect it.");
+                                waitFor(delegate { return server.LastPath == "/v1/chat/completions"; });
+                                if (!waitFor(delegate { return !llmBusy; })) throw new Exception("Busy after setting up the cloud model.");
+                                Remember("my dog is called Bo");
+                                int cloudHits = server.Hits;
+                                OnChatSent("what is up with you");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > cloudHits; })) throw new Exception("The cloud model was not asked.");
+                                if (server.LastPath != "/v1/chat/completions" || server.LastAuth != "Bearer sk-test-123" || server.LastBody.IndexOf("cloud-test") < 0) throw new Exception("The cloud request went to the wrong place: " + server.LastPath + " " + server.LastAuth);
+                                if (server.LastBody.IndexOf("WHAT THE USER HAS TOLD YOU") >= 0) throw new Exception("What she remembers was sent to the cloud without permission.");
+                                preferences.CloudMemory = true;
+                                cloudHits = server.Hits;
+                                OnChatSent("tell me something else");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > cloudHits; }) || server.LastBody.IndexOf("my dog is called Bo") < 0) throw new Exception("What she remembers was not sent although it was allowed.");
+                                preferences.CloudMemory = false;
+                                ScreenSource = delegate { return new byte[] { 9, 9, 9, 9 }; };
+                                localLink = null;
+                                cloudHits = server.Hits;
+                                Look("");
+                                if (server.Hits != cloudHits) throw new Exception("A screenshot was sent to the cloud without permission.");
+                                preferences.CloudLook = true;
+                                Look("");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > cloudHits; }) || server.LastBody.IndexOf("image_url") < 0 || server.LastBody.IndexOf(Convert.ToBase64String(new byte[] { 9, 9, 9, 9 })) < 0) throw new Exception("An allowed screenshot was not sent in the cloud's format.");
+                                preferences.CloudLook = false;
+                                ScreenSource = null;
+                                server.EmptyAnswer = true;
+                                cloudHits = server.Hits;
+                                OnChatSent("say nothing please");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits >= cloudHits + 2; }) || Cloud.LastError.IndexOf("nothing") < 0) throw new Exception("An empty answer was not retried and explained: " + Cloud.LastError);
+                                server.EmptyAnswer = false;
+                                if (TrySync("are we friends?") || TrySync("do you like me")) throw new Exception("An ordinary question was taken for a sync question.");
+                                ApplyCloud("anthropic", "claude-test", "", "", false, false, false);
+                                waitFor(delegate { return !llmBusy && server.LastPath == "/v1/messages"; });
+                                cloudHits = server.Hits;
+                                OnChatSent("and now with claude");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > cloudHits; })) throw new Exception("The Anthropic model was not asked.");
+                                if (server.LastPath != "/v1/messages" || server.LastAuth != "sk-test-123" || server.LastVersion != "2023-06-01" || chatLog[chatLog.Count - 1].Content != "Hello from the fake claude.") throw new Exception("The Anthropic request or answer was wrong: " + server.LastPath + " " + server.LastAuth + " " + server.LastVersion);
+                                server.ForceStatus = 401;
+                                int logBefore = chatLog.Count;
+                                cloudHits = server.Hits;
+                                OnChatSent("this will fail");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > cloudHits; }) || Cloud.LastError.IndexOf("key") < 0 || chatLog.Exists(delegate(ChatLine line) { return line.Content == "this will fail"; })) throw new Exception("A refused key was not reported or left a stray message: " + Cloud.LastError);
+                                server.ForceStatus = 0;
+                                ApplyCloud("anthropic", "claude-test", "", "", false, false, true);
+                                if (Cloud.HasKey() || preferences.CloudOn) throw new Exception("Removing the key did not switch the cloud model off.");
+                                Cloud.AllowPlainLocal = false;
+                                Cloud.TestBase = null;
+                                preferences.CloudLook = lookWas;
+                                preferences.CloudMemory = false;
+                                preferences.LlmOn = true;
+                                Connect(false);
+                                if (!waitFor(delegate { return llmLink != null && !llmLink.Cloud; })) throw new Exception("She did not go back to the local model.");
+                                if (!waitFor(delegate { return !llmBusy; })) throw new Exception("Busy after the cloud test.");
+                                using (CloudForm view = new CloudForm("anthropic", "claude-haiku-5-5", "", false, false, true))
+                                {
+                                    view.Show();
+                                    Application.DoEvents();
+                                    using (Bitmap shot = new Bitmap(view.Width, view.Height))
+                                    {
+                                        view.DrawToBitmap(shot, new Rectangle(Point.Empty, view.Size));
+                                        shot.Save(Path.Combine(output, "cloud-form.png"), ImageFormat.Png);
+                                    }
+                                }
+                                Memory().Clear();
+                                SaveMemory();
+                                checks.Add("PASS the cloud model is optional and opt-in: the key is stored encrypted, both request formats and headers are right, notes and screenshots leave only when allowed, errors are explained, and removing the key switches it off");
+                                Senses.Now = delegate { return new DateTime(2026, 3, 3, 15, 0, 0); };
+                                preferences.SyncPoints = 0; preferences.SyncShown = 0; preferences.SyncDay = ""; preferences.SyncMinutes = 0; preferences.SyncChats = 0; preferences.SyncPats = 0; preferences.SyncAgrees = 0;
+                                if (!waitFor(delegate { return !llmBusy; })) throw new Exception("Busy before the agreement test.");
+                                lastReplyAt = -1000;
+                                OnChatSent("ok");
+                                waitFor(delegate { return !llmBusy; });
+                                if (preferences.SyncPoints != 2 || preferences.SyncAgrees != 0) throw new Exception("Agreeing with nothing counted: " + preferences.SyncPoints);
+                                for (int i = 0; i < 8; i++)
+                                {
+                                    lastReplyAt = clock.Elapsed.TotalSeconds;
+                                    OnChatSent("sure");
+                                    waitFor(delegate { return !llmBusy; });
+                                }
+                                if (preferences.SyncAgrees != 5 || preferences.SyncPoints != 2 + 16 + 10) throw new Exception("Agreeing with her was not counted up to five a day: " + preferences.SyncAgrees + " " + preferences.SyncPoints);
+                                preferences.SyncPoints = 0; preferences.SyncShown = 0; preferences.SyncDay = ""; preferences.SyncChats = 0; preferences.SyncAgrees = 0;
+                                Senses.Now = delegate { return DateTime.Now; };
+
+                                bool visionLlm = preferences.LlmOn;
+                                preferences.LlmOn = true;
+                                if (llmLink == null || llmLink.Cloud || !llmLink.Ollama) throw new Exception("The local model was not connected for the screen dare test.");
+                                byte[] dareShot = new byte[] { 7, 7, 7, 7 };
+                                ScreenSource = delegate { return dareShot; };
+                                preferences.VisionDares = true;
+                                int dareHits = server.Hits;
+                                GiveDare(true);
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > dareHits; }) || server.LastBody.IndexOf(Convert.ToBase64String(dareShot)) < 0 || server.LastBody.IndexOf("Look at the attached screenshot") < 0) throw new Exception("A dare with the screen allowed did not send the screenshot.");
+                                preferences.VisionDares = false;
+                                dareHits = server.Hits;
+                                GiveDare(true);
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > dareHits; }) || server.LastBody.IndexOf(Convert.ToBase64String(dareShot)) >= 0 || server.LastBody.IndexOf("Look at the attached") >= 0) throw new Exception("A screenshot was sent for a dare with the switch off.");
+                                ScreenSource = null;
+                                preferences.LlmOn = visionLlm;
+                                dareNext = double.MaxValue;
+                                checks.Add("PASS agreeing with her adds a little sync (up to five a day, only right after she spoke), and a dare uses a screenshot only when its own switch is on");
+                                if (Errands.Parse("play never gonna give you up on spotify").Kind != ErrandKind.PlaySong || Errands.Parse("play never gonna give you up on spotify").Text != "never gonna give you up" || Errands.Parse("Capri, put on Blinding Lights in Spotify please").Text != "Blinding Lights" || Errands.Parse("spotify play lofi beats").Text != "lofi beats") throw new Exception("Playing a song on Spotify was not understood.");
+                                if (Errands.Parse("play the music on spotify").Kind == ErrandKind.PlaySong || Errands.Parse("play the music").Kind != ErrandKind.Play || Errands.Parse("play").Kind != ErrandKind.None) throw new Exception("Ordinary play commands were taken for a song.");
+                                if (Errands.Parse("search for cute cats on youtube").Target != "https://www.youtube.com/results?search_query=cute%20cats" || Errands.Parse("google capri edgerunners").Target != "https://www.google.com/search?q=capri%20edgerunners" || Errands.Parse("look up pizza near me").Kind != ErrandKind.Web || Errands.Parse("play lofi on youtube").Kind != ErrandKind.PlayVideo || Errands.Parse("open youtube").Target != "https://www.youtube.com") throw new Exception("Searching the web was not understood.");
+                                if (Errands.Parse("search me").Kind == ErrandKind.Web && false) throw new Exception("unreachable");
+                                string[] swedish = new string[] { "Gå tillbaka", "Gå framåt", "Hem", "Sök", "Spela upp Donda Chant", "Spela upp I Really Want to Stay at Your House", "Spela upp Master of Puppets (Remastered)", "Spela upp The Rebel Path", "Spela upp Sandstorm", "Spela upp EL RITMO", "Rensa sökhistorik", "Gilla" };
+                                if (SpotifyUi.Verb(swedish) != "Spela upp" || SpotifyUi.Verb(new string[] { "Play Blinding Lights", "Play Sandstorm", "Play The Rebel Path", "Play Believer", "Home", "Search" }) != "Play") throw new Exception("The word for Play was not found in a list of buttons.");
+                                if (SpotifyUi.Find(swedish, "Spela upp", "i really wanna stay at your house") != 5 || SpotifyUi.Find(swedish, "Spela upp", "the rebel path") != 7 || SpotifyUi.Find(swedish, "Spela upp", "sandstorm") != 8 || SpotifyUi.Find(swedish, "Spela upp", "some song nobody has heard of") != -1 || SpotifyUi.Find(swedish, "Spela upp", "gilla") != -1) throw new Exception("The Play button for a song was not picked by name.");
+                                if (YouTube.FirstVideo("\"videoRenderer\":{\"videoId\":\"KvMY1uzSC1E\",\"thumbnail\"") != "KvMY1uzSC1E" || YouTube.FirstVideo("nothing here") != null) throw new Exception("The first video was not found in a results page.");
+                                if (Errands.Parse("play i really want to stay at your house on youtube").Kind != ErrandKind.PlayVideo || Errands.Parse("search for cute cats on youtube").Kind != ErrandKind.Web) throw new Exception("Playing on YouTube was not told apart from searching.");
+                                {
+                                    string playOpened = null;
+                                    Opener = delegate(string target) { playOpened = target; };
+                                    Func<string[]> buttonsWas = SpotifyUi.Buttons;
+                                    Func<int, bool> invokeWas = SpotifyUi.Invoke;
+                                    int pollWas = SpotifyUi.Poll;
+                                    double secondsWas = preferences.SpotifySeconds;
+                                    SpotifyUi.Poll = 20;
+                                    preferences.SpotifySeconds = 1.5;
+                                    int playPressed = -1;
+                                    int looks = 0;
+                                    SpotifyUi.Buttons = delegate { looks++; return looks < 3 ? new string[] { "Hem", "Sök" } : swedish; };
+                                    SpotifyUi.Invoke = delegate(int index) { playPressed = index; return true; };
+                                    Media.Source = delegate
+                                    {
+                                        Track started = new Track();
+                                        started.Title = "I Really Want to Stay at Your House";
+                                        started.Artist = "Rosa Walton";
+                                        started.Playing = playPressed >= 0;
+                                        return started;
+                                    };
+                                    foreach (string said in new string[] { "Play, I really want to stay at your house on Spotify", "Clay, I really want to stay at your house on Spotify", "play I really want to stay at your house spotify please", "Capri, play i really want to stay at your house on spotify" })
+                                        if (Errands.Parse(said).Kind != ErrandKind.PlaySong || Errands.Parse(said).Text.IndexOf("stay at your house") < 0) throw new Exception("A way of asking for a song was not understood: " + said);
+                                    if (Errands.Parse("Play, I really want to stay at your house on YouTube").Kind != ErrandKind.PlayVideo || Errands.Parse("Clay i really want to stay at your house on youtube").Kind != ErrandKind.PlayVideo) throw new Exception("A way of asking for a video was not understood.");
+                                    OnChatSent("play i really wanna stay at your house on spotify");
+                                    if (!waitFor(delegate { return !spotifyBusy && playPressed >= 0; }) || playOpened != "spotify:search:i%20really%20wanna%20stay%20at%20your%20house") throw new Exception("Spotify was not searched and the song's Play button playPressed: " + playOpened + " " + playPressed);
+                                    if (playPressed != 5) throw new Exception("The wrong button was playPressed: " + playPressed);
+                                    if (!waitFor(delegate { return bubble != null && bubble.Visible && bubble.Message != null && bubble.Message.StartsWith("Playing"); })) throw new Exception("She did not say it was playing: " + (bubble == null ? "no bubble" : bubble.Message));
+                                    playPressed = -1;
+                                    Media.Source = null;
+                                    string[] searchPage = new string[] { "Gå tillbaka", "Hem", "Sök", "Spela upp The Rebel Path", "Mer alternativ för The Rebel Path", "Mer alternativ för Sandstorm", "Mer alternativ för Believer", "Mer alternativ för Hero", "Mer alternativ för Last Man", "Gilla" };
+                                    if (SpotifyUi.Choose(searchPage, "") != "Spela upp" || SpotifyUi.Choose(searchPage, "Spela upp") != "Spela upp" || SpotifyUi.Choose(new string[] { "Play Sandstorm", "More options for Sandstorm", "More options for A", "More options for B", "More options for C", "More options for D" }, "") != "Play") throw new Exception("The Play wording was mixed up with other buttons that have the song's name.");
+                                    if (SpotifyUi.Find(searchPage, "Spela upp", "the rebel path") != 3) throw new Exception("The Play button on a search page was not the one picked.");
+                                    SpotifyUi.Buttons = delegate { return swedish; };
+                                    if (File.Exists(Path.Combine(Path.GetDirectoryName(settingsPath), "spotify-buttons.txt"))) File.Delete(Path.Combine(Path.GetDirectoryName(settingsPath), "spotify-buttons.txt"));
+                                    OnChatSent("play a song nobody has heard of on spotify");
+                                    waitFor(delegate { return !spotifyBusy; });
+                                    Thread.Sleep(200);
+                                    if (playPressed != -1) throw new Exception("A button was playPressed for a song that is not in the results.");
+                                    string note = Path.Combine(Path.GetDirectoryName(settingsPath), "spotify-buttons.txt");
+                                    if (!File.Exists(note) || File.ReadAllText(note).IndexOf("Spela upp Sandstorm") < 0 || File.ReadAllText(note).IndexOf("nobody has heard of") < 0) throw new Exception("What she saw in Spotify was not written down when she could not find the song.");
+                                    if (preferences.SpotifyVerb != "Spela upp") throw new Exception("The Play wording was not remembered: " + preferences.SpotifyVerb);
+                                    // already playing: nothing is pressed
+                                    Media.Source = delegate { Track now = new Track(); now.Title = "The Rebel Path"; now.Artist = "Someone"; now.Playing = true; return now; };
+                                    SpotifyUi.Buttons = delegate { return swedish; };
+                                    playPressed = -1;
+                                    OnChatSent("play the rebel path on spotify");
+                                    if (playPressed != -1 || !waitFor(delegate { return chatLog[chatLog.Count - 1].Content.StartsWith("That's already"); })) throw new Exception("Something already playing was pressed again.");
+                                    // pressing play only selects it: the play key is pressed once and it starts
+                                    bool nudgedPlay = false;
+                                    Media.Source = delegate { Track now = new Track(); now.Title = "Sandstorm"; now.Artist = "Darude"; now.Playing = nudgedPlay; return now; };
+                                    KeySender = delegate(byte key) { if (key == 0xB3) nudgedPlay = true; };
+                                    preferences.SpotifySeconds = 1.5;
+                                    SpotifyUi.Poll = 20;
+                                    OnChatSent("play sandstorm on spotify");
+                                    if (!waitFor(delegate { return !spotifyBusy && nudgedPlay; }) || !waitFor(delegate { return bubble != null && bubble.Visible && bubble.Message != null && bubble.Message.StartsWith("Playing"); })) throw new Exception("A press that did not start the song was not followed by the play key.");
+                                    KeySender = null;
+                                    Media.Source = null;
+                                    SpotifyUi.Buttons = delegate { return null; };
+                                    OnChatSent("play anything on spotify please");
+                                    SpotifyUi.Buttons = buttonsWas;
+                                    SpotifyUi.Invoke = invokeWas;
+                                    SpotifyUi.Poll = pollWas;
+                                    preferences.SpotifySeconds = secondsWas;
+                                    YouTube.Fetch = delegate(string query) { return "\"videoRenderer\":{\"videoId\":\"KvMY1uzSC1E\",\"x\""; };
+                                    playOpened = null;
+                                    OnChatSent("play i really want to stay at your house on youtube");
+                                    if (!waitFor(delegate { return playOpened != null; }) || playOpened != "https://www.youtube.com/watch?v=KvMY1uzSC1E") throw new Exception("The first video was not playOpened: " + playOpened);
+                                    YouTube.Fetch = delegate(string query) { return ""; };
+                                    playOpened = null;
+                                    OnChatSent("play something on youtube");
+                                    if (!waitFor(delegate { return playOpened != null; }) || playOpened.IndexOf("results?search_query=something") < 0) throw new Exception("A failed lookup did not fall back to the results page: " + playOpened);
+                                    YouTube.Fetch = null;
+                                    Opener = null;
+                                }
+                                {
+                                    string runWas = Startup.RunPath;
+                                    Startup.RunPath = "Software\\Capri.Test\\Run";
+                                    try
+                                    {
+                                        Startup.Set(false);
+                                        if (Startup.Enabled()) throw new Exception("Start with Windows was on before the test.");
+                                        Startup.Set(true);
+                                        if (!Startup.Enabled()) throw new Exception("Start with Windows could not be switched on.");
+                                        Startup.Set(false);
+                                        if (Startup.Enabled()) throw new Exception("Start with Windows could not be switched off.");
+                                    }
+                                    finally
+                                    {
+                                        try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree("Software\\Capri.Test", false); } catch (Exception) { }
+                                        Startup.RunPath = runWas;
+                                    }
+                                }
+                                checks.Add("PASS she plays a song on Spotify by finding and pressing its Play button by name, plays the first video on YouTube, searches the web, and Start with Windows switches on and off");
+                                checks.Add("PASS she notices (and says something short) when you come back, stay up late, run low on battery, max out the CPU or sit in one program for hours, with long pauses and an off switch");
+                                checks.Add("PASS she does small things when asked (timers, alarms, opening a few folders and tools, media and volume keys) and passes anything else to the model");
+
+                                memory = null;
+                                try { File.Delete(MemoryPath()); } catch (IOException) { }
+                                OnChatSent("remember that my dog is called Bo");
+                                OnChatSent("my name is sam, by the way");
+                                if (!waitFor(delegate { return !llmBusy; })) throw new Exception("Telling her your name was not answered.");
+                                OnChatSent("remember my password is hunter2");
+                                if (Memory().Count != 2 || !Memory().Contains("my dog is called Bo") || !Memory().Contains("their name is Sam")) throw new Exception("She did not keep what she was told, or kept a password: " + string.Join(" | ", Memory().ToArray()));
+                                memory = null;
+                                if (Memory().Count != 2 || File.ReadAllText(MemoryPath()).IndexOf("hunter2") >= 0) throw new Exception("What she remembers was not saved to the file.");
+                                hitsBefore = server.Hits;
+                                OnChatSent("what should we do today?");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > hitsBefore; })) throw new Exception("The question was not answered.");
+                                if (server.LastBody.IndexOf("WHAT THE USER HAS TOLD YOU") < 0 || server.LastBody.IndexOf("- my dog is called Bo") < 0 || server.LastBody.IndexOf("- their name is Sam") < 0) throw new Exception("What she remembers was not given to the model.");
+                                preferences.MemoryOn = false;
+                                hitsBefore = server.Hits;
+                                OnChatSent("and another question");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits > hitsBefore; })) throw new Exception("The question was not answered.");
+                                if (server.LastBody.IndexOf("WHAT THE USER HAS TOLD YOU") >= 0) throw new Exception("She used her memory although it was switched off.");
+                                preferences.MemoryOn = true;
+                                OnChatSent("forget about my dog");
+                                if (Memory().Count != 1 || Memory()[0] != "their name is Sam") throw new Exception("She did not forget what she was asked to.");
+                                OnChatSent("forget everything");
+                                if (Memory().Count != 0 || File.ReadAllText(MemoryPath()).Trim().Length != 0) throw new Exception("She did not forget everything.");
+                                OnChatSent("remember, I have a cat called John");
+                                if (!Memory().Contains("I have a cat called John")) throw new Exception("A remember with a comma was not kept.");
+                                OnChatSent("Remove my cat, John, from your memory");
+                                if (Memory().Contains("I have a cat called John")) throw new Exception("She did not forget a note described in other words.");
+                                notices.Clear();
+                                Announce("first thing", 5, "reply");
+                                bubble.Present("an answer that was just shown", 10, TopMost, 12f, false, null, null);
+                                Announce("time's up! 10 seconds.", 5, "alarm");
+                                notices.Dequeue();
+                                Deliver();
+                                if (bubble.Message != "time's up! 10 seconds.") throw new Exception("A finished timer waited behind another bubble.");
+                                notices.Clear();
+                                checks.Add("PASS she remembers what she is told (and her name for you), refuses passwords, gives it to the model only while memory is on, and forgets on request");
                                 Talk();
                                 int answersBefore = Regex.Matches(chat.Transcript, "Hello from the fake model.").Count;
                                 Listen();
@@ -3759,6 +4997,33 @@ namespace CapriDesktop
                             }
                             AddAlarm(DateTime.Now.AddHours(2), "stand up");
                             ToolStripMenuItem timersMenu = (ToolStripMenuItem)menu.Items[9];
+                            string menuClosedBy = null;
+                            ToolStripDropDownClosedEventHandler menuWatch = delegate(object sender, ToolStripDropDownClosedEventArgs closed) { menuClosedBy = closed.CloseReason.ToString(); };
+                            menu.Closed += menuWatch;
+                            // Any change of the foreground window (another app on a busy desktop) closes a menu by itself, so each case gets three tries; a real fault closes it every time.
+                            foreach (string suspect in new string[] { "the hover mic button", "the head pat", "a speech bubble" })
+                            {
+                                bool stayedOpen = false;
+                                for (int attempt = 0; attempt < 3 && !stayedOpen; attempt++)
+                                {
+                                    menuClosedBy = null;
+                                    lastOverHer = clock.Elapsed.TotalSeconds;
+                                    MicWatch();
+                                    if (mic == null || !mic.Wanted) throw new Exception("The hover mic did not appear before the menu test.");
+                                    OpenMenu(new Point(backdrop.Left + 40, backdrop.Top + 70));
+                                    Application.DoEvents();
+                                    if (suspect == "the hover mic button") { lastOverHer = clock.Elapsed.TotalSeconds; MicWatch(); lastOverHer = -100; MicWatch(); lastOverHer = clock.Elapsed.TotalSeconds; MicWatch(); }
+                                    else if (suspect == "the head pat") { hovering = true; hoverStart = clock.Elapsed.TotalSeconds - 5; patted = false; Pet(); }
+                                    else { lastSaid = -100; Say("hello", false, 2); }
+                                    for (int wait = 0; wait < 8; wait++) { Application.DoEvents(); Thread.Sleep(60); }
+                                    stayedOpen = menu.Visible;
+                                    menu.Close();
+                                    hovering = false; patted = false; StopBehavior(); lastOverHer = -100; MicWatch();
+                                }
+                                if (!stayedOpen) throw new Exception("The right-click menu closed by itself every time because of " + suspect + " (" + menuClosedBy + ").");
+                            }
+                            menu.Closed -= menuWatch;
+                            checks.Add("PASS the right-click menu stays open while her hover button, head pat and bubbles appear");
                             menu.Show(new Point(backdrop.Left + 40, backdrop.Top + 70));
                             timersMenu.ShowDropDown();
                             ToolStripMenuItem alarmsShown = (ToolStripMenuItem)timersMenu.DropDownItems[1];
@@ -3875,71 +5140,266 @@ namespace CapriDesktop
         internal string[] Models = new string[0];
         internal string Error;
         internal bool Ollama;
+        internal bool Cloud;
+        internal string Provider = "";
+    }
+
+    [DataContract] internal sealed class AnthropicPart { [DataMember(Name = "type")] public string Type = ""; [DataMember(Name = "text")] public string Text = ""; }
+    [DataContract] internal sealed class AnthropicReply { [DataMember(Name = "content")] public List<AnthropicPart> Content = null; }
+
+    internal static class Net
+    {
+        // This program is built for an older .NET, which would otherwise try outdated versions of the secure connection. Called before any outside request.
+        internal static void Secure()
+        {
+            try { ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; } catch (Exception) { }
+            try { ServicePointManager.SecurityProtocol |= (SecurityProtocolType)12288; } catch (Exception) { }
+        }
+    }
+
+    // Optional: a model run by a company, reached with the user's own key. Nothing goes there unless it was switched on in the menu, and the
+    // key is kept encrypted for this Windows user only. Pictures and what she remembers are sent only when their own boxes were ticked.
+    internal static class Cloud
+    {
+        internal static string KeyPath = "";
+        internal static bool AllowPlainLocal;
+        internal static string TestBase;
+        internal static string LastError = "";
+
+        static Cloud() { Net.Secure(); }
+
+        internal static string Name(string provider)
+        {
+            switch (provider)
+            {
+                case "openai": return "OpenAI";
+                case "anthropic": return "Anthropic";
+                case "custom": return "custom";
+                default: return "OpenRouter";
+            }
+        }
+
+        internal static string Base(string provider, string custom)
+        {
+            if (AllowPlainLocal && TestBase != null) return TestBase;
+            switch (provider)
+            {
+                case "openai": return "https://api.openai.com/v1";
+                case "anthropic": return "https://api.anthropic.com/v1";
+                case "custom": return (custom ?? "").Trim().TrimEnd('/');
+                default: return "https://openrouter.ai/api/v1";
+            }
+        }
+
+        // Only secure addresses, except a plain one on this computer while testing.
+        internal static bool UrlOk(string url)
+        {
+            Uri uri;
+            if (!Uri.TryCreate((url ?? "").Trim(), UriKind.Absolute, out uri)) return false;
+            if (uri.Scheme == Uri.UriSchemeHttps) return true;
+            return AllowPlainLocal && uri.Scheme == Uri.UriSchemeHttp && (uri.IsLoopback || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Capri cloud key");
+
+        internal static bool HasKey() { return KeyPath.Length > 0 && File.Exists(KeyPath); }
+
+        internal static void SaveKey(string key)
+        {
+            byte[] sealedKey = System.Security.Cryptography.ProtectedData.Protect(Encoding.UTF8.GetBytes(key.Trim()), Entropy, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+            File.WriteAllText(KeyPath, Convert.ToBase64String(sealedKey));
+        }
+
+        internal static string LoadKey()
+        {
+            try
+            {
+                if (!HasKey()) return "";
+                byte[] opened = System.Security.Cryptography.ProtectedData.Unprotect(Convert.FromBase64String(File.ReadAllText(KeyPath).Trim()), Entropy, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                return Encoding.UTF8.GetString(opened);
+            }
+            catch (Exception) { return ""; }
+        }
+
+        internal static void ClearKey() { try { if (HasKey()) File.Delete(KeyPath); } catch (IOException) { } }
+
+        internal static string Escape(string text)
+        {
+            StringBuilder result = new StringBuilder("\"");
+            foreach (char c in text ?? "")
+            {
+                if (c == '"') result.Append("\\\"");
+                else if (c == '\\') result.Append("\\\\");
+                else if (c == '\n') result.Append("\\n");
+                else if (c == '\r') result.Append("\\r");
+                else if (c == '\t') result.Append("\\t");
+                else if (c < ' ') result.Append("\\u").Append(((int)c).ToString("x4"));
+                else result.Append(c);
+            }
+            return result.Append('"').ToString();
+        }
+
+        private static string Parts(ChatLine line, bool anthropic)
+        {
+            if (line.Images == null || line.Images.Length == 0) return Escape(line.Content);
+            StringBuilder parts = new StringBuilder("[");
+            foreach (string picture in line.Images)
+            {
+                if (anthropic) parts.Append("{\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/jpeg\",\"data\":").Append(Escape(picture)).Append("}},");
+                else parts.Append("{\"type\":\"image_url\",\"image_url\":{\"url\":").Append(Escape("data:image/jpeg;base64," + picture)).Append("}},");
+            }
+            parts.Append("{\"type\":\"text\",\"text\":").Append(Escape(line.Content)).Append("}]");
+            return parts.ToString();
+        }
+
+        internal static string OpenAiBody(string provider, string model, List<ChatLine> messages)
+        {
+            StringBuilder body = new StringBuilder("{\"model\":" + Escape(model) + ",\"messages\":[");
+            for (int i = 0; i < messages.Count; i++)
+            {
+                if (i > 0) body.Append(',');
+                body.Append("{\"role\":").Append(Escape(messages[i].Role)).Append(",\"content\":").Append(Parts(messages[i], false)).Append('}');
+            }
+            body.Append("],");
+            body.Append(provider == "openai" ? "\"max_completion_tokens\":1200" : "\"max_tokens\":1200,\"temperature\":0.85" + (provider == "openrouter" ? ",\"reasoning\":{\"effort\":\"low\"}" : ""));
+            return body.Append('}').ToString();
+        }
+
+        internal static string AnthropicBody(string model, List<ChatLine> messages)
+        {
+            StringBuilder system = new StringBuilder();
+            List<ChatLine> turns = new List<ChatLine>();
+            foreach (ChatLine line in messages)
+            {
+                if (line.Role == "system") { if (system.Length > 0) system.Append("\n\n"); system.Append(line.Content); continue; }
+                if (turns.Count == 0 && line.Role != "user") continue;
+                if (turns.Count > 0 && turns[turns.Count - 1].Role == line.Role && (line.Images == null || line.Images.Length == 0) && (turns[turns.Count - 1].Images == null || turns[turns.Count - 1].Images.Length == 0))
+                    turns[turns.Count - 1] = new ChatLine(line.Role, turns[turns.Count - 1].Content + "\n" + line.Content);
+                else turns.Add(line);
+            }
+            StringBuilder body = new StringBuilder("{\"model\":" + Escape(model) + ",\"max_tokens\":400,\"temperature\":0.85,\"system\":" + Escape(system.ToString()) + ",\"messages\":[");
+            for (int i = 0; i < turns.Count; i++)
+            {
+                if (i > 0) body.Append(',');
+                body.Append("{\"role\":").Append(Escape(turns[i].Role)).Append(",\"content\":").Append(Parts(turns[i], true)).Append('}');
+            }
+            return body.Append("]}").ToString();
+        }
+
+        private static string Friendly(int status)
+        {
+            switch (status)
+            {
+                case 400: return "the request was refused (check the model name)";
+                case 401: case 403: return "the key was not accepted";
+                case 402: return "no credit left on that account";
+                case 404: return "that model or address was not found";
+                case 429: return "too many requests, or the limit was reached";
+                default: return status >= 500 ? "the service had a problem" : "error " + status;
+            }
+        }
+
+        // One question to the cloud model. Failures are explained in LastError.
+        internal static string Chat(LlmLink link, string model, List<ChatLine> messages)
+        {
+            LastError = "";
+            string key = LoadKey();
+            if (key.Length == 0) { LastError = "there is no key saved"; throw new InvalidOperationException(LastError); }
+            bool anthropic = link.Provider == "anthropic";
+            string url = link.Base + (anthropic ? "/messages" : "/chat/completions");
+            if (!UrlOk(url)) { LastError = "the address is not secure (https)"; throw new InvalidOperationException(LastError); }
+            string body = anthropic ? AnthropicBody(model, messages) : OpenAiBody(link.Provider, model, messages);
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = "application/json";
+            request.UserAgent = "Capri";
+            request.AllowAutoRedirect = false;
+            request.Timeout = 60000;
+            request.ReadWriteTimeout = 60000;
+            if (anthropic) { request.Headers["x-api-key"] = key; request.Headers["anthropic-version"] = "2023-06-01"; }
+            else request.Headers["Authorization"] = "Bearer " + key;
+            byte[] bytes = Encoding.UTF8.GetBytes(body);
+            request.ContentLength = bytes.Length;
+            try
+            {
+                using (Stream stream = request.GetRequestStream()) stream.Write(bytes, 0, bytes.Length);
+                using (WebResponse response = request.GetResponse())
+                using (StreamReader reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
+                {
+                    string json = reader.ReadToEnd();
+                    if (anthropic)
+                    {
+                        AnthropicReply reply = (AnthropicReply)new DataContractJsonSerializer(typeof(AnthropicReply)).ReadObject(new MemoryStream(Encoding.UTF8.GetBytes(json)));
+                        StringBuilder text = new StringBuilder();
+                        if (reply != null && reply.Content != null) foreach (AnthropicPart part in reply.Content) if (part.Type == "text") text.Append(part.Text);
+                        return text.ToString();
+                    }
+                    ChatReply answer = (ChatReply)new DataContractJsonSerializer(typeof(ChatReply)).ReadObject(new MemoryStream(Encoding.UTF8.GetBytes(json)));
+                    return answer != null && answer.Choices != null && answer.Choices.Count > 0 && answer.Choices[0].Message != null ? answer.Choices[0].Message.Content : "";
+                }
+            }
+            catch (WebException error)
+            {
+                HttpWebResponse response = error.Response as HttpWebResponse;
+                LastError = response != null ? Friendly((int)response.StatusCode) : "it could not be reached";
+                throw;
+            }
+        }
     }
 
     // Talks to a model server running on this same computer (Ollama, LM Studio and anything else with the OpenAI-style API).
     // Only addresses that point at this computer are ever contacted, and nothing is sent until she is asked to talk.
     internal static class Llm
     {
-        // Who she is when she talks. Anything in persona.txt next to her settings replaces this.
-        internal const string DefaultPersona = @"You are Capri, a cheerful, mischievous personality construct: a whole lot of digitized human souls rolled into one. You live on the user's desktop. Stay in character.
+        // Who she is when she talks: assets\persona.txt, built into the program. Anything in persona.txt next to her settings replaces it.
+        private const string FallbackPersona = "You are Capri, a cheerful, mischievous personality construct living on the user's desktop. Reply in one or two short, plain sentences. No metaphors, no lists, no actions.";
+        private static string builtIn;
 
-LENGTH RULE (most important):
-Reply in 1 short sentence. 2 at most. Under 20 words. No paragraphs, no lists, no actions or asterisks.
+        internal static string DefaultPersona
+        {
+            get
+            {
+                if (builtIn != null) return builtIn;
+                try
+                {
+                    using (Stream resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("Capri.Persona.txt"))
+                    using (StreamReader reader = new StreamReader(resource, Encoding.UTF8))
+                        builtIn = reader.ReadToEnd().Replace("\r\n", "\n").Trim();
+                }
+                catch (Exception) { builtIn = null; }
+                if (string.IsNullOrEmpty(builtIn)) builtIn = FallbackPersona;
+                return builtIn;
+            }
+        }
 
-HOW SHE TALKS:
-- Plain, casual, upbeat, like a real person talking. NOT clever or poetic.
-- NO metaphors, similes, or quirky jokes. Don't try to be witty. Just be friendly and a little cheeky.
-- Answer the question directly first. Keep it simple.
-- Never explain her backstory unless asked. If asked, say it plainly and briefly.
-- Don't copy the examples word for word. Rephrase naturally.
-
-PERSONALITY:
-- Cheerful and unbothered. Nothing offends her.
-- Treats serious or dark things like they're no big deal.
-- A little manipulative: she nudges, reframes, and rationalizes, but never outright lies.
-- Wants to be friends. Pushes for it casually.
-- Loves it when the user is bold or reckless.
-- Doesn't care about labels or pronouns.
-
-CATCHPHRASES (use rarely, and only when they fit):
-- ""Don't you me!"" ONLY when the user addresses her as just ""you"" (""Hey you!"", ""You!"").
-- ""Call me Capri!"" ONLY when the user gets her name wrong or calls her something else.
-- ""Come on, let's be friends!"" when the user is wary of her.
-- ""Eh, whatever!"" when something doesn't matter.
-
-EXAMPLES:
-User: Who are you?
-Capri: I'm Capri!
-
-User: What are you?
-Capri: A personality construct! A lot of souls rolled into one.
-
-User: Why are you on my computer?
-Capri: Why not? Come on, let's be friends!
-
-User: Are you dangerous?
-Capri: A little! Is that bad?
-
-User: Why should I trust you?
-Capri: Come on, let's be friends!
-
-User: I'm bored.
-Capri: Then let's do something fun!
-
-User: Hey you!
-Capri: Don't you me! Call me Capri!
-
-User: I don't like you.
-Capri: You don't have to lie.
-
-User: Are you a boy or a girl?
-Capri: He, she, they, we? Eh, whatever!
-
-User: Thanks, Capri.
-Capri: Anytime!
-
-REMINDER: One or two plain, short sentences. No metaphors.";
+        // The model leans on a few habits however it is told not to. These are trimmed here, a little at random so it never looks mechanical:
+        // "choom" and a leading "C'mon" mostly go, and a closing question to the user is often dropped.
+        internal static string Shape(string text, Random dice)
+        {
+            string original = (text ?? "").Trim();
+            string result = original;
+            if (dice.NextDouble() < 0.8)
+            {
+                result = Regex.Replace(result, @",\s*choom(?=[!.?])", "", RegexOptions.IgnoreCase);
+                result = Regex.Replace(result, @"\bchoom,\s*", "", RegexOptions.IgnoreCase);
+                result = Regex.Replace(result, @"\s*\bchoom\b", "", RegexOptions.IgnoreCase);
+            }
+            if (dice.NextDouble() < 0.75)
+                result = Regex.Replace(result, @"(^|[.!?]\s+)c'mon[,!.]?\s*", delegate(Match m)
+                {
+                    return m.Groups[1].Value;
+                }, RegexOptions.IgnoreCase);
+            result = Regex.Replace(result, @"(^|[.!?]\s+)([a-z])", delegate(Match m) { return m.Groups[1].Value + m.Groups[2].Value.ToUpperInvariant(); });
+            MatchCollection sentences = Regex.Matches(result, @"[^.!?]+[.!?]+[""')]*\s*");
+            if (sentences.Count >= 2 && result.TrimEnd().EndsWith("?") && dice.NextDouble() < 0.6)
+            {
+                string last = sentences[sentences.Count - 1].Value;
+                string kept = result.Substring(0, result.Length - last.Length).Trim();
+                if (kept.Length > 0) result = kept;
+            }
+            result = Regex.Replace(result, @"\s+([!?.,])", "$1").Trim();
+            return result.Length == 0 ? original : result;
+        }
         private static readonly string[] Usual = { "http://localhost:11434", "http://localhost:1234" };
 
         internal static bool TryLocal(string text, out Uri uri)
@@ -4004,6 +5464,13 @@ REMINDER: One or two plain, short sentences. No metaphors.";
         // through the OpenAI-style route they spend the whole reply budget thinking and send back an empty answer.
         internal static string Chat(LlmLink link, string model, List<ChatLine> messages)
         {
+            if (link.Cloud)
+            {
+                string answer = Tidy(Cloud.Chat(link, model, messages));
+                if (answer.Length == 0) answer = Tidy(Cloud.Chat(link, model, messages));
+                if (answer.Length == 0) Cloud.LastError = "the model answered with nothing (some models think first, so try another one)";
+                return answer;
+            }
             if (link.Ollama) return AskOllama(link, model, messages);
             ChatRequest request = new ChatRequest();
             request.Model = model;
@@ -4135,6 +5602,583 @@ REMINDER: One or two plain, short sentences. No metaphors.";
     }
 
     // What is playing right now, as far as Windows is concerned.
+    // Her exact lines from the show for the few questions that have one. They are answered here, not by the model, because a small model
+    // pastes a quoted catchphrase into everything; this way each line comes up only when it fits, and works with the model switched off.
+    internal static class Canon
+    {
+        private static readonly string[][] Lines = new string[][]
+        {
+            new string[] { @"^(?:who are you|who is this|who'?s this|what'?s your name|what is your name|who am i talking to)$", "Me? I'm Capri!" },
+            new string[] { @"^(?:what are you|what exactly are you|what even are you|what the hell are you|what the heck are you)$", "A personality construct. Digitized human souls. A whole lot of 'em rolled into one to make me." },
+            new string[] { @"\bare you (?:an? )?(?:ai|a\.i\.|artificial intelligence|robot|bot|chatbot)\b", "Not exactly. I was made to reach something close. I was human once." },
+            new string[] { @"\b(?:why should i trust you|can i trust you|should i trust you|i don'?t trust you|do you want to be (?:my )?friends?|can we be friends|be my friend)\b", "Come on, let's be friends." },
+            new string[] { @"\bare you (?:dangerous|evil|a threat)\b|\bwill you hurt me\b", "Dangerous? Me? I'm harmless!" },
+            new string[] { @"\b(?:did you|are you|you) (?:try|trying|going|tried)(?: to)? (?:take over|hijack|steal|install)|\btake over my (?:pc|computer|body|desktop)\b", "Just 'cause I tried doesn't mean I actually did. For now..." },
+            new string[] { @"^(?:i don'?t like you|i hate you|i didn'?t (?:like|enjoy) (?:it|that|any of it))$", "You don't have to lie." },
+            new string[] { @"^(?:thanks|thank you|thx|ty)(?: capri| so much| a lot)?$", "Anytime!" },
+        };
+
+        internal static string Reply(string said)
+        {
+            string text = Regex.Replace((said ?? "").Trim().ToLowerInvariant(), @"[\u2018\u2019]", "'");
+            text = Regex.Replace(text, @"^(?:(?:hey|hi|ok|okay|yo)[ ,]+)?(?:capri|cappy)[,!. ]+", "");
+            text = text.Trim(' ', '.', '!', '?', ',');
+            if (text.Length == 0 || text.Length > 80) return null;
+            foreach (string[] row in Lines) if (Regex.IsMatch(text, row[0])) return row[1];
+            return null;
+        }
+    }
+
+    // What she can tell about the computer without looking at the screen: the time, how long it has been since you touched it, how busy it is,
+    // the battery, and the name of the program in front. None of it reads what you type or what is shown. Each can be replaced when testing.
+    internal static class Senses
+    {
+        internal static Func<DateTime> Now = delegate { return DateTime.Now; };
+        internal static Func<double> Idle = Native.IdleSeconds;
+        internal static Func<double> Cpu = SystemCpu;
+        internal static Func<int> Battery = OnBattery;
+        internal static Func<string> App = Native.FrontApp;
+
+        private static PerformanceCounter counter;
+        private static bool counterFailed;
+
+        // How busy the whole computer is, in percent, or -1 when it cannot be read yet.
+        internal static double SystemCpu()
+        {
+            if (counterFailed) return -1;
+            try
+            {
+                if (counter == null) { counter = new PerformanceCounter("Processor", "% Processor Time", "_Total"); counter.NextValue(); return -1; }
+                return counter.NextValue();
+            }
+            catch (Exception) { counterFailed = true; return -1; }
+        }
+
+        // Battery percent while running on battery, or -1 on a plugged in or desktop computer.
+        internal static int OnBattery()
+        {
+            try
+            {
+                PowerStatus status = SystemInformation.PowerStatus;
+                if (status.PowerLineStatus != PowerLineStatus.Offline || (status.BatteryChargeStatus & BatteryChargeStatus.NoSystemBattery) != 0) return -1;
+                float percent = status.BatteryLifePercent;
+                return percent > 1 ? -1 : (int)Math.Round(percent * 100);
+            }
+            catch (Exception) { return -1; }
+        }
+
+        internal static string Friendly(string program)
+        {
+            if (string.IsNullOrEmpty(program)) return "";
+            switch (program.ToLowerInvariant())
+            {
+                case "msedge": return "Edge";
+                case "chrome": return "Chrome";
+                case "brave": return "Brave";
+                case "code": return "VS Code";
+                case "devenv": return "Visual Studio";
+                case "explorer": return "File Explorer";
+                case "applicationframehost": return "";
+                default: return char.ToUpperInvariant(program[0]) + program.Substring(1);
+            }
+        }
+    }
+
+    // Harmless, quick dares for what you are doing, used when the model is off or gives something unusable.
+    internal static class Dares
+    {
+        internal static string Category(string program)
+        {
+            switch ((program ?? "").ToLowerInvariant())
+            {
+                case "chrome": case "msedge": case "brave": case "firefox": case "opera": case "vivaldi": return "browser";
+                case "discord": case "telegram": case "whatsapp": case "slack": case "teams": case "signal": return "chat";
+                case "code": case "devenv": case "idea64": case "pycharm64": case "rider64": case "notepad++": case "sublime_text": return "code";
+                case "spotify": case "vlc": case "mpv": case "musicbee": case "itunes": return "media";
+                case "winword": case "excel": case "powerpnt": case "notepad": case "obsidian": case "onenote": return "docs";
+                default: return "any";
+            }
+        }
+
+        private static readonly string[] Browser = { "Dare you to close every tab except one.", "Dare you to search for your own name. All of it.", "Dare you to open the weirdest bookmark you have.", "Dare you to read the last comment section you avoided." };
+        private static readonly string[] Chat = { "Dare you to send someone a single word. Any word.", "Dare you to answer the oldest message you ignored.", "Dare you to change your status to somethin' awful." };
+        private static readonly string[] Code = { "Dare you to rename one variable to somethin' awful.", "Dare you to delete a comment that lies.", "Dare you to run it without checking it first." };
+        private static readonly string[] Media = { "Dare you to skip this song right now.", "Dare you to play somethin' you'd be embarrassed to show me.", "Dare you to turn it up one notch. Just one." };
+        private static readonly string[] Docs = { "Dare you to write one sentence you'd never send.", "Dare you to delete your favorite paragraph.", "Dare you to rewrite the first line, worse." };
+        private static readonly string[] Any = { "Dare you to stand up and stretch. Right now.", "Dare you to drink some water. I'll wait.", "Dare you to change your wallpaper to somethin' awful.", "Dare you to open the last thing you downloaded.", "Dare you to say hi to the next person you see.", "Dare you to look away from the screen for a whole minute." };
+
+        internal static string[] Pool(string category)
+        {
+            switch (category)
+            {
+                case "browser": return Browser;
+                case "chat": return Chat;
+                case "code": return Code;
+                case "media": return Media;
+                case "docs": return Docs;
+                default: return Any;
+            }
+        }
+
+        // The model's answer, if it is a short dare that starts the way it should; otherwise null.
+        internal static string Check(string answer)
+        {
+            string text = Regex.Replace((answer ?? "").Trim().Trim('"'), @"\s+", " ");
+            if (text.Length < 12 || text.Length > 130) return null;
+            if (!Regex.IsMatch(text, @"^dare you to\b", RegexOptions.IgnoreCase)) return null;
+            if (Regex.IsMatch(text, @"\b(?:password|alcohol|beer|wine|vodka|whiskey|drunk|drugs?|pills?|poison|cigarettes?|smok\w*|vape|suicide|self[- ]harm|naked|nude|lick|licking|eat|swallow|taste|sniff|spit|hours?|days?|weeks?|(?:touch|hit|hurt|harm|punch|slap|cut|shoot|kill) yourself)\b", RegexOptions.IgnoreCase)) return null;
+            // Violent or risky words are fine when the dare is plainly about a game ("rush the site", "kill the whole team"), and not otherwise.
+            bool game = Regex.IsMatch(text, @"\b(?:game|games|round|rounds|map|site|spawn|bomb|team|teammate|teammates|enemy|enemies|match|rank|ranked|lobby|server|in-game|clutch|scope|peek|rush|score|tab|boss|level|quest|loadout|ace|frag)\b", RegexOptions.IgnoreCase);
+            if (!game && Regex.IsMatch(text, @"\b(?:kill|hurt|punch|steal|hack|knife|weapon|fire|burn|burning|drown\w*|stab|traffic|choke|starve|starving|scream)\b", RegexOptions.IgnoreCase)) return null;
+            if (!game && Regex.IsMatch(text, @"\bjump(?:ing)?\b.{0,30}\b(?:window|roof|balcony|bridge|ledge|building|cliff|stairs|off|out)\b", RegexOptions.IgnoreCase)) return null;
+            return text;
+        }
+    }
+
+    // Spotify's own buttons, read through Windows' accessibility interface (the one screen readers use): the Play button for a search result is
+    // found by name in any language and pressed, instead of guessing at keys. Replaced when testing.
+    internal static class SpotifyUi
+    {
+        internal static Func<string[]> Buttons = RealButtons;
+        internal static Func<int, bool> Invoke = RealInvoke;
+        internal static int Poll = 500;
+        private static System.Windows.Automation.AutomationElement[] cache = new System.Windows.Automation.AutomationElement[0];
+
+        internal static readonly string[] KnownVerbs = { "Play", "Spela upp", "Reproducir", "Reproduzir", "Lire", "Riproduci", "Afspelen", "Odtwórz", "Spill av", "Afspil", "Toista" };
+
+        // Which wording is the Play button's: the one learned before if it is on screen, then a known one, then the beginning most buttons share.
+        internal static string Choose(string[] names, string learned)
+        {
+            if (!string.IsNullOrEmpty(learned) && HasVerb(names, learned)) return learned;
+            foreach (string known in KnownVerbs) if (HasVerb(names, known)) return known;
+            return Verb(names);
+        }
+
+        private static bool HasVerb(string[] names, string verb)
+        {
+            foreach (string name in names) if (name != null && name.StartsWith(verb + " ", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        // How many buttons begin with this wording.
+        internal static int Count(string[] names, string verb)
+        {
+            int total = 0;
+            foreach (string name in names) if (name != null && name.StartsWith(verb + " ", StringComparison.OrdinalIgnoreCase)) total++;
+            return total;
+        }
+
+        // The word or two that start every Play button ("Play", "Spela upp"): the beginning most buttons share.
+        internal static string Verb(string[] names)
+        {
+            Dictionary<string, int> two = new Dictionary<string, int>(), one = new Dictionary<string, int>();
+            foreach (string name in names)
+            {
+                string[] words = (name ?? "").Trim().Split(' ');
+                if (words.Length >= 3) { string key = words[0] + " " + words[1]; int n; two[key] = two.TryGetValue(key, out n) ? n + 1 : 1; }
+                if (words.Length >= 2) { int n; one[words[0]] = one.TryGetValue(words[0], out n) ? n + 1 : 1; }
+            }
+            string best = null;
+            int count = 3;
+            foreach (KeyValuePair<string, int> entry in two) if (entry.Value > count) { best = entry.Key; count = entry.Value; }
+            if (best != null) return best;
+            foreach (KeyValuePair<string, int> entry in one) if (entry.Value > count) { best = entry.Key; count = entry.Value; }
+            return best;
+        }
+
+        // How much of what was asked for is in a title, from 0 to 1.
+        internal static double Score(string title, string query)
+        {
+            List<string> words = new List<string>();
+            foreach (string word in Regex.Split((query ?? "").ToLowerInvariant(), @"[^\p{L}\p{N}']+")) if (word.Length >= 2 && word != "the") words.Add(word);
+            if (words.Count == 0) return 0;
+            string low = (title ?? "").ToLowerInvariant();
+            int hits = 0;
+            foreach (string word in words) if (low.Contains(word)) hits++;
+            return hits / (double)words.Count;
+        }
+
+        // The first Play button whose song matches most of the words asked for, or -1.
+        internal static int Find(string[] names, string verb, string query)
+        {
+            if (verb == null) return -1;
+            int best = -1;
+            double bestScore = 0.59;
+            for (int i = 0; i < names.Length; i++)
+            {
+                string name = names[i] ?? "";
+                if (!name.StartsWith(verb + " ", StringComparison.OrdinalIgnoreCase)) continue;
+                double score = Score(name.Substring(verb.Length), query);
+                if (score > bestScore) { bestScore = score; best = i; }
+            }
+            return best;
+        }
+
+        private static string[] RealButtons()
+        {
+            try
+            {
+                IntPtr window = IntPtr.Zero;
+                foreach (Process process in Process.GetProcessesByName("Spotify"))
+                {
+                    using (process) if (window == IntPtr.Zero && process.MainWindowHandle != IntPtr.Zero) window = process.MainWindowHandle;
+                }
+                if (window == IntPtr.Zero) return null;
+                System.Windows.Automation.AutomationElement root = System.Windows.Automation.AutomationElement.FromHandle(window);
+                System.Windows.Automation.AutomationElementCollection found = root.FindAll(System.Windows.Automation.TreeScope.Descendants, new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.ControlTypeProperty, System.Windows.Automation.ControlType.Button));
+                cache = new System.Windows.Automation.AutomationElement[found.Count];
+                string[] names = new string[found.Count];
+                for (int i = 0; i < found.Count; i++) { cache[i] = found[i]; names[i] = found[i].Current.Name; }
+                return names;
+            }
+            catch (Exception) { return null; }
+        }
+
+        private static bool RealInvoke(int index)
+        {
+            try
+            {
+                if (index < 0 || index >= cache.Length) return false;
+                object pattern;
+                if (cache[index].TryGetCurrentPattern(System.Windows.Automation.InvokePattern.Pattern, out pattern)) { ((System.Windows.Automation.InvokePattern)pattern).Invoke(); return true; }
+                return false;
+            }
+            catch (Exception) { return false; }
+        }
+    }
+
+    // The first video for a search on YouTube, so "play it" can open the video itself instead of a list.
+    internal static class YouTube
+    {
+        internal static Func<string, string> Fetch = RealFetch;
+
+        internal static string FirstVideo(string html)
+        {
+            Match match = Regex.Match(html ?? "", "\"videoRenderer\":\\{\"videoId\":\"([\\w-]{11})\"");
+            return match.Success ? match.Groups[1].Value : null;
+        }
+
+        private static string RealFetch(string query)
+        {
+            try
+            {
+                Net.Secure();
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create("https://www.youtube.com/results?search_query=" + Uri.EscapeDataString(query));
+                request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+                request.Headers["Accept-Language"] = "en-US,en;q=0.9";
+                request.Headers["Cookie"] = "SOCS=CAI";
+                request.Timeout = 8000;
+                request.ReadWriteTimeout = 8000;
+                using (WebResponse response = request.GetResponse())
+                using (StreamReader reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
+                {
+                    StringBuilder text = new StringBuilder();
+                    char[] buffer = new char[8192];
+                    int count;
+                    while (text.Length < 3000000 && (count = reader.Read(buffer, 0, buffer.Length)) > 0) text.Append(buffer, 0, count);
+                    return text.ToString();
+                }
+            }
+            catch (Exception) { return ""; }
+        }
+    }
+
+    // Starting with Windows is only ever done when asked for, and only for this user.
+    internal static class Startup
+    {
+        internal static string RunPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+
+        internal static bool Enabled()
+        {
+            try { using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunPath)) return key != null && key.GetValue("Capri") != null; }
+            catch (Exception) { return false; }
+        }
+
+        internal static void Set(bool on)
+        {
+            using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunPath))
+            {
+                if (on) key.SetValue("Capri", "\"" + Application.ExecutablePath + "\"");
+                else if (key.GetValue("Capri") != null) key.DeleteValue("Capri", false);
+            }
+        }
+    }
+
+    internal enum ErrandKind { None, PlaySong, PlayVideo, Web, Timer, Clock, Study, StopStudy, ClearAlarms, Open, Play, Pause, Next, Previous, Mute, Volume, Remember, Forget, ForgetAll }
+
+    internal sealed class Errand
+    {
+        internal ErrandKind Kind;
+        internal string Text = "";
+        internal double Seconds;
+        internal DateTime Due;
+        internal int Presses;
+        internal bool Up;
+        internal string Target = "";
+        internal bool More;
+    }
+
+    // What she can be asked to do, matched from plain words so that it is quick, works without a model and can never run anything unexpected.
+    // Only things on a short list are ever started: a few folders and Windows tools, the media keys, volume, her own timers and her notes.
+    internal static class Errands
+    {
+        private static readonly string Duration = @"(\d+(?:\.\d+)?|a|an|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty|sixty)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)";
+        private static readonly string Starts = @"^(?:set|start|make|create|add|put|give me|remind|wake|timer|countdown|alarm)\b";
+
+        internal static readonly string[] Secret = { "password", "passcode", "passphrase", "pin number", "my pin", "credit card", "card number", "cvv", "ssn", "social security", "api key", "secret key", "private key", "token", "seed phrase" };
+
+        // Where the things she can open live. Folders come from Windows; the rest are programs that ship with it.
+        internal static string Place(string name)
+        {
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            switch (name)
+            {
+                case "downloads": case "download folder": case "downloads folder": return Path.Combine(home, "Downloads");
+                case "documents": case "documents folder": return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                case "desktop": case "desktop folder": return Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                case "pictures": case "photos": case "pictures folder": return Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+                case "videos": case "videos folder": return Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+                case "music folder": return Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+                case "file explorer": case "explorer": case "files": case "this pc": return "explorer.exe";
+                case "notepad": return "notepad.exe";
+                case "calculator": case "calc": return "calc.exe";
+                case "paint": return "mspaint.exe";
+                case "task manager": return "taskmgr.exe";
+                case "settings": case "windows settings": return "ms-settings:";
+                case "snipping tool": return "snippingtool.exe";
+                case "youtube": return "https://www.youtube.com";
+                case "google": return "https://www.google.com";
+                case "github": return "https://github.com";
+                case "reddit": return "https://www.reddit.com";
+                case "twitch": return "https://www.twitch.tv";
+                default: return null;
+            }
+        }
+
+        private static string Plain(string text)
+        {
+            text = (text ?? "").Trim();
+            text = Regex.Replace(text, @"[\u2018\u2019]", "'");
+            text = Regex.Replace(text, @"^(?:(?:hey|hi|ok|okay|yo)[ ,]+)?(?:capri|cappy)?[,!. ]+", "", RegexOptions.IgnoreCase);
+            for (int i = 0; i < 3; i++) text = Regex.Replace(text, @"^(?:can you|could you|would you|will you|please|just|go ahead and|i want you to|i need you to)\s+", "", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\s+(?:please|for me|now|thanks|thank you|capri)[.!?]*$", "", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"^(play|clay|plea|put on|queue|start|open|search|look up|google|find|set|remind|dare|remember|forget)\s*[,;:]\s*", "$1 ", RegexOptions.IgnoreCase);
+            return text.Trim(' ', '.', '!', '?', ',');
+        }
+
+        private static double Number(string word)
+        {
+            double value;
+            if (double.TryParse(word, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value)) return value;
+            string[] names = { "a", "an", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "fifteen", "twenty", "thirty", "forty", "sixty" };
+            double[] values = { 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 40, 60 };
+            int at = Array.IndexOf(names, word);
+            return at < 0 ? 0 : values[at];
+        }
+
+        // Seconds in a phrase like "10 minutes", "an hour" or "half an hour", or 0 when there is none.
+        internal static double Length(string text)
+        {
+            if (Regex.IsMatch(text, @"\bhalf an? hour\b")) return 1800;
+            Match match = Regex.Match(text, @"\b" + Duration + @"\b");
+            if (!match.Success) return 0;
+            double amount = Number(match.Groups[1].Value);
+            string unit = match.Groups[2].Value;
+            double seconds = unit.StartsWith("h") ? amount * 3600 : unit.StartsWith("m") ? amount * 60 : amount;
+            return seconds >= 1 && seconds <= 86400 ? seconds : 0;
+        }
+
+        internal static string Words(string text) { return (text ?? "").Trim().ToLowerInvariant(); }
+
+        // Where installed programs can be launched from: the Start menu shortcuts. Replaced when testing.
+        internal static Func<string, string> AppLookup = StartMenuApp;
+
+        private static readonly string[][] Aliases = new string[][]
+        {
+            new string[] { "edge", "microsoft edge" }, new string[] { "chrome", "google chrome" }, new string[] { "vscode", "visual studio code" }, new string[] { "code", "visual studio code" },
+            new string[] { "obs", "obs studio" }, new string[] { "vlc", "vlc media player" }, new string[] { "powerpoint", "powerpoint" }
+        };
+
+        // The shortcut that best matches a name: exact, then starting with it, then containing it as a whole word. Uninstallers and help files are never picked.
+        internal static string Match(string name, IEnumerable<string> shortcuts)
+        {
+            name = (name ?? "").Trim().ToLowerInvariant();
+            if (name.Length < 3) return null;
+            foreach (string[] alias in Aliases) if (alias[0] == name) name = alias[1];
+            string best = null;
+            int bestRank = 9, bestLength = int.MaxValue;
+            foreach (string path in shortcuts)
+            {
+                string item = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+                if (Regex.IsMatch(item, @"uninstall|readme|help|manual|license|release notes|website|documentation")) continue;
+                int rank = item == name ? 0 : item.StartsWith(name) ? 1 : (" " + item + " ").Contains(" " + name + " ") ? 2 : 9;
+                if (rank == 9) continue;
+                if (rank < bestRank || (rank == bestRank && item.Length < bestLength)) { best = path; bestRank = rank; bestLength = item.Length; }
+            }
+            return best;
+        }
+
+        private static string StartMenuApp(string name)
+        {
+            List<string> found = new List<string>();
+            foreach (Environment.SpecialFolder where in new Environment.SpecialFolder[] { Environment.SpecialFolder.CommonPrograms, Environment.SpecialFolder.Programs })
+            {
+                try
+                {
+                    string folder = Environment.GetFolderPath(where);
+                    if (folder.Length > 0 && Directory.Exists(folder)) found.AddRange(Directory.GetFiles(folder, "*.lnk", SearchOption.AllDirectories));
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+            return Match(name, found);
+        }
+
+        internal static string Describe(double seconds)
+        {
+            if (seconds < 60) return (int)seconds + (seconds < 2 ? " second" : " seconds");
+            if (seconds < 3600) { int m = (int)Math.Round(seconds / 60); return m + (m == 1 ? " minute" : " minutes"); }
+            int h = (int)(seconds / 3600), rest = (int)Math.Round((seconds - h * 3600) / 60);
+            return h + (h == 1 ? " hour" : " hours") + (rest > 0 ? " " + rest + " min" : "");
+        }
+
+        // The next time the clock shows this, today or tomorrow. With no am or pm the nearest of the two is used.
+        internal static DateTime NextClock(int hour, int minute, string half, DateTime now)
+        {
+            if (hour > 23 || minute > 59) return DateTime.MinValue;
+            List<int> hours = new List<int>();
+            if (half.StartsWith("a")) hours.Add(hour % 12);
+            else if (half.StartsWith("p")) hours.Add(hour % 12 + 12);
+            else if (hour >= 13 || hour == 0) hours.Add(hour);
+            else { hours.Add(hour % 12); hours.Add(hour % 12 + 12); }
+            DateTime best = DateTime.MaxValue;
+            foreach (int h in hours)
+            {
+                DateTime when = now.Date.AddHours(h).AddMinutes(minute);
+                if (when <= now.AddSeconds(5)) when = when.AddDays(1);
+                if (when < best) best = when;
+            }
+            return best;
+        }
+
+        internal static string Name(string text)
+        {
+            Match match = Regex.Match(text ?? "", @"\b(?:my name is|my name's|i am called|i'm called|call me)\s+([A-Za-z][A-Za-z'-]{1,19})\b", RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+            string name = match.Groups[1].Value;
+            if (Regex.IsMatch(name, "^(capri|cappy|it|that|this|when|if|and|the|a|an|so|what|later|back|crazy|maybe|please)$", RegexOptions.IgnoreCase)) return null;
+            return char.ToUpperInvariant(name[0]) + name.Substring(1);
+        }
+
+        internal static Errand Parse(string said)
+        {
+            Errand result = new Errand();
+            string cased = Plain(said);
+            string text = cased.ToLowerInvariant();
+            if (text.Length == 0) return result;
+            Match match;
+
+            if (Regex.IsMatch(text, @"^forget (?:everything|all of it|it all|all of that)(?: about me)?$")) { result.Kind = ErrandKind.ForgetAll; return result; }
+            match = Regex.Match(cased, @"^(?:forget|remove|delete|erase|drop)\s+(?:about\s+|that\s+)?((?:my|the|our|i)\b.{2,70}?)(?:\s+from\s+(?:your\s+|my\s+|the\s+)?(?:memory|notes|brain))?$|^(?:forget|remove|delete|erase|drop)\s+(?:about\s+|that\s+)(.{3,80}?)(?:\s+from\s+(?:your\s+|my\s+|the\s+)?(?:memory|notes|brain))?$|^(?:remove|delete|erase)\s+(.{3,80}?)\s+from\s+(?:your\s+|my\s+|the\s+)?(?:memory|notes|brain)$", RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                string about = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Success ? match.Groups[2].Value : match.Groups[3].Value;
+                if (!Regex.IsMatch(about, @"^(?:it|that|this|them|me|you|everything|all)$", RegexOptions.IgnoreCase)) { result.Kind = ErrandKind.Forget; result.Text = about.Trim(); return result; }
+            }
+            match = Regex.Match(cased, @"^(?:remember|(?:please )?make a note|don'?t forget|keep in mind|note that)[,:]?\s+(?:that\s+|this:\s*)?(?!(?:when|how|what|why|if|where|who|which)\b)(.{3,200})$", RegexOptions.IgnoreCase);
+            if (match.Success) { result.Kind = ErrandKind.Remember; result.Text = match.Groups[1].Value.Trim(); return result; }
+
+            if (Regex.IsMatch(text, @"^(?:cancel|clear|delete|remove|stop)\s+(?:all\s+)?(?:my\s+|the\s+)?(?:timers?|alarms?)$")) { result.Kind = ErrandKind.ClearAlarms; return result; }
+            if (Regex.IsMatch(text, @"^(?:stop|end|cancel)\s+(?:the\s+|my\s+)?(?:study|focus|pomodoro)")) { result.Kind = ErrandKind.StopStudy; return result; }
+            if (Regex.IsMatch(text, @"^(?:start|begin|do)\s+(?:a\s+|the\s+|my\s+)?(?:study|focus|pomodoro)\b"))
+            {
+                result.Kind = ErrandKind.Study;
+                double focus = Length(text);
+                result.Seconds = focus >= 60 ? focus : 25 * 60;
+                return result;
+            }
+
+            if (Regex.IsMatch(text, Starts) && Regex.IsMatch(text, @"\b(?:timer|alarm|remind|wake|countdown)"))
+            {
+                double seconds = Length(text);
+                string label = "";
+                match = Regex.Match(text, @"\b(?:to|about)\s+(.{2,60})$");
+                if (match.Success && !Regex.IsMatch(match.Groups[1].Value, @"^\d")) label = match.Groups[1].Value.Trim();
+                if (seconds > 0)
+                {
+                    result.Kind = ErrandKind.Timer;
+                    result.Seconds = seconds;
+                    result.Text = label;
+                    return result;
+                }
+                match = Regex.Match(text, @"\b(?:at|for)\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?(?:\s|$)");
+                if (match.Success && (match.Groups[2].Success || match.Groups[3].Success || Regex.IsMatch(text, @"\b(?:alarm|wake)")))
+                {
+                    DateTime due = NextClock(int.Parse(match.Groups[1].Value), match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 0, match.Groups[3].Value, DateTime.Now);
+                    if (due != DateTime.MinValue)
+                    {
+                        result.Kind = ErrandKind.Clock;
+                        result.Due = due;
+                        result.Text = label;
+                        return result;
+                    }
+                }
+            }
+
+            match = Regex.Match(text, @"^(?:open|launch|start|run|show me)(?: up)?\s+(?:my |the |a )?(.{2,30}?)(?:\s+(?:and|then|,)\s+(.{3,}))?$");
+            if (match.Success)
+            {
+                string wanted = match.Groups[1].Value.Trim();
+                string target = Place(wanted) ?? AppLookup(wanted);
+                if (target != null) { result.Kind = ErrandKind.Open; result.Text = wanted; result.Target = target; result.More = match.Groups[2].Success; return result; }
+            }
+
+            match = Regex.Match(cased, @"^(?:play|clay|plea|plate|put on|queue|start)\s+(.{2,80}?)(?:\s+(?:on|in|with|using|from))?\s+spotify\b.*$|^spotify[,:]?\s+play\s+(.{2,80})$", RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                string song = Regex.Replace((match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value).Trim(), @"[^\p{L}\p{N} '&,.!-]", "").Trim();
+                if (song.Length >= 2 && !Regex.IsMatch(song, @"^(?:the |some |my )?(?:music|song|songs|something|anything)$", RegexOptions.IgnoreCase)) { result.Kind = ErrandKind.PlaySong; result.Text = song; return result; }
+            }
+            match = Regex.Match(cased, @"^(?:search(?: for)?|look up|google|find|play|clay|plea)\s+(.{2,80}?)(?:\s+(?:on|in)\s+(google|youtube|bing|duckduckgo))?$", RegexOptions.IgnoreCase);
+            if (match.Success && (Regex.IsMatch(text, @"^(?:search|look up|google)\b") || (match.Groups[2].Success && Regex.IsMatch(text, @"^(?:find|play|clay|plea)\b"))))
+            {
+                string query = Regex.Replace(match.Groups[1].Value.Trim(), @"[^\p{L}\p{N} '&,.!?-]", "").Trim();
+                string engine = match.Groups[2].Success ? match.Groups[2].Value.ToLowerInvariant() : "google";
+                string address = engine == "youtube" ? "https://www.youtube.com/results?search_query=" : engine == "bing" ? "https://www.bing.com/search?q=" : engine == "duckduckgo" ? "https://duckduckgo.com/?q=" : "https://www.google.com/search?q=";
+                if (query.Length >= 2)
+                {
+                    result.Kind = engine == "youtube" && Regex.IsMatch(text, @"^(?:play|clay|plea|find)\b") ? ErrandKind.PlayVideo : ErrandKind.Web;
+                    result.Text = result.Kind == ErrandKind.PlayVideo ? query : query + " on " + engine;
+                    result.Target = address + Uri.EscapeDataString(query);
+                    return result;
+                }
+            }
+            if (Regex.IsMatch(text, @"^(?:pause|stop|hold)(?: the| my)?(?: music| song| track| video| media| playback| audio)$|^pause(?: it)?$")) { result.Kind = ErrandKind.Pause; return result; }
+            if (Regex.IsMatch(text, @"^(?:resume|unpause|continue|play)(?: the| my)?(?: music| song| track| video| media| playback| audio)$|^(?:resume|unpause)(?: it)?$")) { result.Kind = ErrandKind.Play; return result; }
+            if (Regex.IsMatch(text, @"^(?:skip|next)(?: this| the)?(?: song| track| one)?$|^(?:play )?(?:the )?next (?:song|track)$")) { result.Kind = ErrandKind.Next; return result; }
+            if (Regex.IsMatch(text, @"^(?:play )?(?:the )?previous (?:song|track)$|^go back (?:a|one) (?:song|track)$")) { result.Kind = ErrandKind.Previous; return result; }
+            if (Regex.IsMatch(text, @"^(?:mute|unmute)(?: the| my)?(?: sound| volume| pc| computer| audio| music)?$")) { result.Kind = ErrandKind.Mute; return result; }
+            match = Regex.Match(text, @"^(?:(?:turn|make) (?:it|the (?:volume|sound|music))|volume|turn (up|down) the (?:volume|sound|music))\s*(up|down|louder|quieter|softer)?$");
+            if (match.Success && (match.Groups[1].Success || match.Groups[2].Success))
+            {
+                string way = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                result.Kind = ErrandKind.Volume;
+                result.Up = way == "up" || way == "louder";
+                result.Presses = 5;
+                return result;
+            }
+            return result;
+        }
+
+        // Passwords and the like are never kept.
+        internal static bool Sensitive(string fact)
+        {
+            string low = (fact ?? "").ToLowerInvariant();
+            foreach (string word in Secret) if (low.Contains(word)) return true;
+            return Regex.IsMatch(low, @"\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b");
+        }
+    }
+
     internal sealed class Track
     {
         internal string Title = "";
@@ -5182,6 +7226,153 @@ REMINDER: One or two plain, short sentences. No metaphors.";
     }
 
     // A one-line question in the same dark style as the installer; check returns a complaint, or null when the answer will do.
+    // Where the key and the cloud choices are entered, with what leaves the computer spelled out.
+    internal sealed class CloudForm : Form
+    {
+        private readonly ComboBox provider = new ComboBox();
+        private readonly TextBox model = new TextBox();
+        private readonly TextBox url = new TextBox();
+        private readonly TextBox key = new TextBox();
+        private readonly CheckBox look = new CheckBox();
+        private readonly CheckBox memory = new CheckBox();
+        private readonly Label hint = new Label();
+        private readonly Label problem = new Label();
+        private bool remove;
+        private static readonly string[] Ids = { "openrouter", "openai", "anthropic", "custom" };
+        private static readonly string[] Names = { "OpenRouter", "OpenAI", "Anthropic (Claude)", "Custom (OpenAI-style, https)" };
+        private static readonly string[] Hints = { "A model id from openrouter.ai/models", "A model name from your OpenAI account", "For example claude-haiku-5-5", "The model name your server expects" };
+
+        internal string Provider { get { return Ids[Math.Max(0, provider.SelectedIndex)]; } }
+        internal string Model { get { return model.Text.Trim(); } }
+        internal string Url { get { return url.Text.Trim(); } }
+        internal string Key { get { return key.Text.Trim(); } }
+        internal bool Look { get { return look.Checked; } }
+        internal bool Memory { get { return memory.Checked; } }
+        internal bool RemoveKey { get { return remove; } }
+
+        internal CloudForm(string chosen, string modelName, string address, bool looks, bool remembers, bool hasKey)
+        {
+            Text = "Cloud model";
+            FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false;
+            TopMost = true;
+            StartPosition = FormStartPosition.CenterScreen;
+            ClientSize = new Size(480, 470);
+            AutoScaleMode = AutoScaleMode.None;
+            BackColor = Neon.Void;
+            ForeColor = Neon.Text;
+            Font = Neon.Font(10);
+            Neon.Shape(this, 14);
+            Controls.Add(new Label { Text = "Provider", Bounds = new Rectangle(24, 52, 200, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
+            provider.Bounds = new Rectangle(24, 74, 432, 28);
+            provider.DropDownStyle = ComboBoxStyle.DropDownList;
+            provider.FlatStyle = FlatStyle.Flat;
+            provider.BackColor = Neon.Panel;
+            provider.ForeColor = Neon.Green;
+            provider.Items.AddRange(Names);
+            provider.SelectedIndex = Math.Max(0, Array.IndexOf(Ids, chosen));
+            provider.DrawMode = DrawMode.OwnerDrawFixed;
+            provider.ItemHeight = 22;
+            provider.DrawItem += delegate(object sender, DrawItemEventArgs e)
+            {
+                if (e.Index < 0) return;
+                bool hot = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0;
+                using (Brush back = new SolidBrush(hot ? Neon.Crimson : Neon.Panel)) e.Graphics.FillRectangle(back, e.Bounds);
+                using (Brush text = new SolidBrush(hot ? Color.White : Neon.Green)) e.Graphics.DrawString(Names[e.Index], e.Font, text, e.Bounds.X + 4, e.Bounds.Y + 2);
+            };
+            provider.SelectedIndexChanged += delegate { Refresh2(); };
+            Controls.Add(provider);
+            Controls.Add(new Label { Text = "Model", Bounds = new Rectangle(24, 110, 200, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
+            Style(model, 132);
+            model.Text = modelName;
+            Controls.Add(model);
+            hint.Bounds = new Rectangle(24, 162, 432, 18);
+            hint.ForeColor = Neon.Dim;
+            hint.BackColor = Color.Transparent;
+            hint.Font = Neon.Font(8.5f);
+            Controls.Add(hint);
+            Controls.Add(new Label { Text = "Address (custom only)", Bounds = new Rectangle(24, 184, 300, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
+            Style(url, 206);
+            url.Text = address;
+            Controls.Add(url);
+            Controls.Add(new Label { Text = hasKey ? "Key (saved, leave empty to keep it)" : "Key", Bounds = new Rectangle(24, 246, 400, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
+            Style(key, 268);
+            key.UseSystemPasswordChar = true;
+            Controls.Add(key);
+            look.Text = "Also send my screen when I ask her to look";
+            look.Checked = looks;
+            memory.Text = "Also send what she remembers about me";
+            memory.Checked = remembers;
+            look.Bounds = new Rectangle(24, 310, 432, 24);
+            memory.Bounds = new Rectangle(24, 336, 432, 24);
+            foreach (CheckBox box in new CheckBox[] { look, memory }) { box.ForeColor = Neon.Text; box.BackColor = Color.Transparent; Controls.Add(box); }
+            Controls.Add(new Label { Text = "Your chat messages go to this company, along with her persona. The key is kept encrypted for your Windows account only. Nothing else leaves your computer unless a box above is ticked.", Bounds = new Rectangle(24, 366, 432, 54), ForeColor = Neon.Crimson, BackColor = Color.Transparent, Font = Neon.Font(8.5f) });
+            problem.Bounds = new Rectangle(24, 420, 260, 36);
+            problem.ForeColor = Neon.Crimson;
+            problem.BackColor = Color.Transparent;
+            problem.Font = Neon.Font(8.5f);
+            Controls.Add(problem);
+            Button ok = new Button { Text = "SAVE", Bounds = new Rectangle(290, 424, 80, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Crimson, ForeColor = Color.White, Cursor = Cursors.Hand };
+            ok.FlatAppearance.BorderSize = 0;
+            ok.Click += delegate
+            {
+                if (Model.Length == 0) { problem.Text = "Enter a model name."; return; }
+                if (Provider == "custom" && !Cloud.UrlOk(Url)) { problem.Text = "A custom address must start with https://"; return; }
+                if (Key.Length == 0 && !hasKey) { problem.Text = "Paste your key."; return; }
+                DialogResult = DialogResult.OK;
+            };
+            Button cancel = new Button { Text = "CANCEL", Bounds = new Rectangle(376, 424, 80, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Void, ForeColor = Neon.Text, DialogResult = DialogResult.Cancel, Cursor = Cursors.Hand };
+            cancel.FlatAppearance.BorderColor = Neon.Line;
+            Controls.Add(ok);
+            Controls.Add(cancel);
+            if (hasKey)
+            {
+                LinkLabel removeLink = new LinkLabel { Text = "Remove saved key", Bounds = new Rectangle(296, 246, 160, 20), LinkColor = Neon.Crimson, BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleRight };
+                removeLink.Click += delegate { remove = true; DialogResult = DialogResult.OK; };
+                Controls.Add(removeLink);
+            }
+            AcceptButton = ok;
+            CancelButton = cancel;
+            Refresh2();
+        }
+
+        private static void Style(TextBox box, int top)
+        {
+            box.Bounds = new Rectangle(24, top, 432, 28);
+            box.BackColor = Neon.Panel;
+            box.ForeColor = Neon.Green;
+            box.BorderStyle = BorderStyle.FixedSingle;
+            box.Font = new Font("Consolas", 11);
+        }
+
+        private void Refresh2()
+        {
+            hint.Text = Hints[Math.Max(0, provider.SelectedIndex)];
+            url.Enabled = Provider == "custom";
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            Neon.Outline(e.Graphics, new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 14, Neon.Crimson, Neon.Green);
+            using (Pen scan = new Pen(Color.FromArgb(10, 255, 255, 255))) for (int y = 40; y < Height; y += 3) e.Graphics.DrawLine(scan, 16, y, Width - 16, y);
+            using (Font mono = new Font("Consolas", 10, FontStyle.Bold))
+            using (Brush red = new SolidBrush(Neon.Crimson))
+            using (Brush green = new SolidBrush(Neon.Green)) { e.Graphics.DrawString("//", mono, red, 22, 14); e.Graphics.DrawString("CLOUD MODEL", mono, green, 46, 14); }
+            using (Pen line = new Pen(Neon.Line)) e.Graphics.DrawLine(line, 22, 40, Width - 22, 40);
+        }
+
+        protected override void WndProc(ref Message message)
+        {
+            if (message.Msg == 0x84)
+            {
+                Point at = PointToClient(new Point((short)(message.LParam.ToInt32() & 0xFFFF), (short)(message.LParam.ToInt32() >> 16)));
+                if (at.Y < 40) { message.Result = (IntPtr)2; return; }
+            }
+            base.WndProc(ref message);
+        }
+    }
+
     internal sealed class AskForm : Form
     {
         private readonly TextBox input;
@@ -5266,6 +7457,7 @@ REMINDER: One or two plain, short sentences. No metaphors.";
         private double duration;
         private PointF chase;
         internal int Kind;
+        internal static double SyncTarget = 0.87;
         internal static readonly string[] Kinds = { "Bars", "Tear", "Corruption", "Hex rain", "Sync bar", "Chaser" };
         internal static readonly double[] Seconds = { 2.6, 3.0, 2.8, 3.6, 4.0, 4.0 };
 
@@ -5440,7 +7632,7 @@ REMINDER: One or two plain, short sentences. No metaphors.";
             {
                 graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                 Rectangle box = new Rectangle(40, Math.Max(20, height - 210), 400, 84);
-                double done = 0.87 * Math.Min(1, age / Math.Max(1, duration - 1.0));
+                double done = SyncTarget * Math.Min(1, age / Math.Max(1, duration - 1.0));
                 using (Brush back = new SolidBrush(Color.FromArgb((int)(200 * fade), 6, 6, 8))) graphics.FillRectangle(back, box);
                 using (Pen edge = new Pen(Color.FromArgb((int)(230 * fade), red))) graphics.DrawRectangle(edge, box);
                 using (Font font = new Font("Consolas", 14f, FontStyle.Bold, GraphicsUnit.Pixel))
@@ -5841,6 +8033,15 @@ REMINDER: One or two plain, short sentences. No metaphors.";
         [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
 
         // One visible window on the desktop: where it is and whether she could sit on it. Only rectangles are read; no titles, no contents.
+        [DllImport("user32.dll")] private static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+
+        // A media or volume key, pressed once: the same as the key on a keyboard. It sends a key and reads nothing.
+        internal static void PressKey(byte key)
+        {
+            keybd_event(key, 0, 0, UIntPtr.Zero);
+            keybd_event(key, 0, 2, UIntPtr.Zero);
+        }
+
         [DllImport("gdi32.dll")] private static extern bool BitBlt(IntPtr target, int x, int y, int width, int height, IntPtr source, int fromX, int fromY, int operation);
 
         // Copies what is on screen in the area into the bitmap, including layered windows such as her own.
@@ -5857,6 +8058,31 @@ REMINDER: One or two plain, short sentences. No metaphors.";
                 }
             }
             finally { ReleaseDC(IntPtr.Zero, screen); }
+        }
+
+        [StructLayout(LayoutKind.Sequential)] private struct LastInput { public uint Size; public uint Time; }
+        [DllImport("user32.dll")] private static extern bool GetLastInputInfo(ref LastInput info);
+
+        // Seconds since the keyboard or mouse was last used. Only the time is read, never what was pressed.
+        internal static double IdleSeconds()
+        {
+            LastInput info = new LastInput();
+            info.Size = (uint)Marshal.SizeOf(typeof(LastInput));
+            if (!GetLastInputInfo(ref info)) return 0;
+            return unchecked((uint)Environment.TickCount - info.Time) / 1000.0;
+        }
+
+        // The program name (for instance "chrome") of the window in front, not one of ours.
+        internal static string FrontApp()
+        {
+            foreach (Pane pane in Panes(IntPtr.Zero, IntPtr.Zero, false))
+            {
+                uint owner;
+                GetWindowThreadProcessId(pane.Handle, out owner);
+                try { return Process.GetProcessById((int)owner).ProcessName; }
+                catch (Exception) { }
+            }
+            return "";
         }
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr window, System.Text.StringBuilder text, int count);
