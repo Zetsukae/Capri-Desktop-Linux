@@ -3205,6 +3205,7 @@ namespace CapriDesktop
             internal string LastVersion = "";
             internal int ForceStatus;
             internal bool EmptyAnswer;
+            internal bool RejectExtras;
 
             internal FakeServer()
             {
@@ -3239,9 +3240,12 @@ namespace CapriDesktop
                     : "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"<think>hmm</think>  Hello   from the fake model.\"}}]}";
                 byte[] bytes = Encoding.UTF8.GetBytes(answer);
                 if (EmptyAnswer && path == "/v1/chat/completions") answer = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"\"}}]}";
+                if (ForceStatus >= 400 && !models && !version) answer = "{\"error\":{\"message\":\"bad model\"}}";
+                if (RejectExtras && !models && !version && (body.IndexOf("\"temperature\"") >= 0 || body.IndexOf("\"reasoning\"") >= 0)) { answer = "{\"error\":{\"message\":\"temperature is not supported\"}}"; context.Response.StatusCode = 400; }
                 bytes = Encoding.UTF8.GetBytes(answer);
                 if (Broken && !models && !version) context.Response.StatusCode = 500;
                 if (ForceStatus != 0 && !models && !version) context.Response.StatusCode = ForceStatus;
+                if (RejectExtras && context.Response.StatusCode == 200 && !models && !version && (body.IndexOf("\"temperature\"") >= 0 || body.IndexOf("\"reasoning\"") >= 0)) context.Response.StatusCode = 400;
                 if (NoOllama && (version || path == "/api/chat")) context.Response.StatusCode = 404;
                 context.Response.ContentType = "application/json";
                 context.Response.OutputStream.Write(bytes, 0, bytes.Length);
@@ -3960,6 +3964,16 @@ namespace CapriDesktop
                                 if (!waitFor(delegate { return !llmBusy && server.Hits > cloudHits; }) || server.LastBody.IndexOf("image_url") < 0 || server.LastBody.IndexOf(Convert.ToBase64String(new byte[] { 9, 9, 9, 9 })) < 0) throw new Exception("An allowed screenshot was not sent in the cloud's format.");
                                 preferences.CloudLook = false;
                                 ScreenSource = null;
+                                server.RejectExtras = true;
+                                cloudHits = server.Hits;
+                                OnChatSent("this model refuses extras");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits >= cloudHits + 2; }) || server.LastBody.IndexOf("\"temperature\"") >= 0 || chatLog[chatLog.Count - 1].Content != "Hello from the fake model.") throw new Exception("A request the model refused was not retried with plain settings: " + Cloud.LastError);
+                                server.RejectExtras = false;
+                                server.ForceStatus = 400;
+                                cloudHits = server.Hits;
+                                OnChatSent("this model is refused");
+                                if (!waitFor(delegate { return !llmBusy && server.Hits >= cloudHits + 2; }) || Cloud.LastError.IndexOf("bad model") < 0 || Cloud.LastError.IndexOf("refused") < 0) throw new Exception("The provider's own message was not shown: " + Cloud.LastError);
+                                server.ForceStatus = 0;
                                 server.EmptyAnswer = true;
                                 cloudHits = server.Hits;
                                 OnChatSent("say nothing please");
@@ -5252,7 +5266,10 @@ namespace CapriDesktop
             return parts.ToString();
         }
 
-        internal static string OpenAiBody(string provider, string model, List<ChatLine> messages)
+        internal static string OpenAiBody(string provider, string model, List<ChatLine> messages) { return OpenAiBody(provider, model, messages, false); }
+
+        // The plain version leaves out temperature and reasoning effort, which some models refuse.
+        internal static string OpenAiBody(string provider, string model, List<ChatLine> messages, bool plain)
         {
             StringBuilder body = new StringBuilder("{\"model\":" + Escape(model) + ",\"messages\":[");
             for (int i = 0; i < messages.Count; i++)
@@ -5261,11 +5278,14 @@ namespace CapriDesktop
                 body.Append("{\"role\":").Append(Escape(messages[i].Role)).Append(",\"content\":").Append(Parts(messages[i], false)).Append('}');
             }
             body.Append("],");
-            body.Append(provider == "openai" ? "\"max_completion_tokens\":1200" : "\"max_tokens\":1200,\"temperature\":0.85" + (provider == "openrouter" ? ",\"reasoning\":{\"effort\":\"low\"}" : ""));
+            if (plain) body.Append(provider == "openai" ? "\"max_completion_tokens\":800" : "\"max_tokens\":400");
+            else body.Append(provider == "openai" ? "\"max_completion_tokens\":1200" : "\"max_tokens\":1200,\"temperature\":0.85" + (provider == "openrouter" ? ",\"reasoning\":{\"effort\":\"low\"}" : ""));
             return body.Append('}').ToString();
         }
 
-        internal static string AnthropicBody(string model, List<ChatLine> messages)
+        internal static string AnthropicBody(string model, List<ChatLine> messages) { return AnthropicBody(model, messages, false); }
+
+        internal static string AnthropicBody(string model, List<ChatLine> messages, bool plain)
         {
             StringBuilder system = new StringBuilder();
             List<ChatLine> turns = new List<ChatLine>();
@@ -5277,7 +5297,7 @@ namespace CapriDesktop
                     turns[turns.Count - 1] = new ChatLine(line.Role, turns[turns.Count - 1].Content + "\n" + line.Content);
                 else turns.Add(line);
             }
-            StringBuilder body = new StringBuilder("{\"model\":" + Escape(model) + ",\"max_tokens\":400,\"temperature\":0.85,\"system\":" + Escape(system.ToString()) + ",\"messages\":[");
+            StringBuilder body = new StringBuilder("{\"model\":" + Escape(model) + ",\"max_tokens\":400," + (plain ? "" : "\"temperature\":0.85,") + "\"system\":" + Escape(system.ToString()) + ",\"messages\":[");
             for (int i = 0; i < turns.Count; i++)
             {
                 if (i > 0) body.Append(',');
@@ -5299,16 +5319,29 @@ namespace CapriDesktop
             }
         }
 
-        // One question to the cloud model. Failures are explained in LastError.
+        internal static int LastStatus;
+
+        // One question to the cloud model. A request the model refuses is tried once more with plain settings. Failures are explained in LastError.
         internal static string Chat(LlmLink link, string model, List<ChatLine> messages)
         {
+            try { return Send(link, model, messages, false); }
+            catch (WebException)
+            {
+                if (LastStatus != 400) throw;
+                return Send(link, model, messages, true);
+            }
+        }
+
+        private static string Send(LlmLink link, string model, List<ChatLine> messages, bool plain)
+        {
             LastError = "";
+            LastStatus = 0;
             string key = LoadKey();
             if (key.Length == 0) { LastError = "there is no key saved"; throw new InvalidOperationException(LastError); }
             bool anthropic = link.Provider == "anthropic";
             string url = link.Base + (anthropic ? "/messages" : "/chat/completions");
             if (!UrlOk(url)) { LastError = "the address is not secure (https)"; throw new InvalidOperationException(LastError); }
-            string body = anthropic ? AnthropicBody(model, messages) : OpenAiBody(link.Provider, model, messages);
+            string body = anthropic ? AnthropicBody(model, messages, plain) : OpenAiBody(link.Provider, model, messages, plain);
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
             request.ContentType = "application/json";
@@ -5341,7 +5374,22 @@ namespace CapriDesktop
             catch (WebException error)
             {
                 HttpWebResponse response = error.Response as HttpWebResponse;
-                LastError = response != null ? Friendly((int)response.StatusCode) : "it could not be reached";
+                string why = "";
+                if (response != null)
+                {
+                    try
+                    {
+                        using (StreamReader reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
+                        {
+                            Match said = Regex.Match(reader.ReadToEnd(), "\"message\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+                            if (said.Success) why = Regex.Unescape(said.Groups[1].Value);
+                        }
+                    }
+                    catch (Exception) { }
+                }
+                if (why.Length > 160) why = why.Substring(0, 157) + "...";
+                LastStatus = response != null ? (int)response.StatusCode : 0;
+                LastError = (response != null ? Friendly((int)response.StatusCode) : "it could not be reached") + (why.Length > 0 ? " - " + why : "");
                 throw;
             }
         }

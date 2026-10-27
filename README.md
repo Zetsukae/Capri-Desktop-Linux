@@ -91,6 +91,7 @@ Chat, voice and Look use a model server on your own computer. [Ollama](https://o
 No GPU? Chat, Cloud model settings lets you use OpenRouter, OpenAI, Anthropic, or any OpenAI-style https address with **your own API key**. A Claude or ChatGPT subscription is not an API key; keys come from the provider's developer console and are billed separately (her replies are short, so a small model costs very little).
 
 - Providers show a key only once, when you create it. Copy it then; if you lose it, make a new one. Free models on OpenRouter work with a $0 key. Some models think before answering and may feel slow or sometimes answer with nothing; she retries once and tells you.
+- If a model says "the request was refused", she tries once more with plain settings and shows the provider's own message. Copy the model's exact id (on OpenRouter, the copy button next to its name; free ones end in `:free`) and pick one that is not labeled "thinking" or "reasoning", since those often answer with nothing.
 - It is off until you switch it on. Your chat messages and her persona are sent to that company.
 - Screenshots (Look) and her notes about you are **not** sent unless you tick their own boxes in the dialog. Without that box, Look still works if you also run a local vision model.
 - The key is stored encrypted for your Windows account only (`%LocalAppData%\Capri\cloud.key`), never in the settings file.
