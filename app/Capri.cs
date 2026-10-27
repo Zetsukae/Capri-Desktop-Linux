@@ -108,6 +108,7 @@ namespace CapriDesktop
         [DataMember] public bool LlmOn;
         [DataMember] public string LlmUrl = "";
         [DataMember] public string LlmModel = "";
+        [DataMember] public string Language = "en";
 
         // The JSON serializer skips field initializers, so settings saved by older versions would turn every new switch off.
         [OnDeserializing]
@@ -131,6 +132,7 @@ namespace CapriDesktop
             MicButton = true;
             MusicMode = 0;
             MicDevice = "";
+            Language = "en";
             UseWhisper = true;
             LookOn = true;
             MemoryOn = true;
@@ -346,6 +348,7 @@ namespace CapriDesktop
             Cloud.KeyPath = Path.Combine(data, "cloud.key");
             voice = new Voice(Path.Combine(data, "voices"), chance);
             preferences = smoke ? new Preferences() : LoadPreferences();
+            Lang.Load(smoke ? "en" : preferences.Language, data);
             ear.Device = preferences.MicDevice ?? "";
             ear.UseWhisper = preferences.UseWhisper;
             ear.PauseSeconds = preferences.PauseSeconds;
@@ -380,24 +383,25 @@ namespace CapriDesktop
             title.Enabled = false;
             menu.Items.Add(title);
             menu.Items.Add(new ToolStripSeparator());
-            visibilityItem = new ToolStripMenuItem("Hide Capri", null, delegate { if (fullscreenAway) { fullscreenAway = false; fullscreenOverride = true; } SetHidden(!hidden); });
+            visibilityItem = new ToolStripMenuItem(Lang.T("Hide Capri"), null, delegate { if (fullscreenAway) { fullscreenAway = false; fullscreenOverride = true; } SetHidden(!hidden); });
             menu.Items.Add(visibilityItem);
-            ToolStripMenuItem sizes = new ToolStripMenuItem("Size");
+            ToolStripMenuItem sizes = new ToolStripMenuItem(Lang.T("Size"));
+            sizes.Name = "size";
             AddSize(sizes, "Small", 170);
             AddSize(sizes, "Medium", 240);
             AddSize(sizes, "Large", 320);
             menu.Items.Add(sizes);
-            motionItem = new ToolStripMenuItem("Idle motion", null, delegate { preferences.Motion = !preferences.Motion; motionItem.Checked = preferences.Motion; if (!preferences.Motion) StopBehavior(); UpdateAutomatic(); UpdateAnimation(); SavePreferences(); });
+            motionItem = new ToolStripMenuItem(Lang.T("Idle motion"), null, delegate { preferences.Motion = !preferences.Motion; motionItem.Checked = preferences.Motion; if (!preferences.Motion) StopBehavior(); UpdateAutomatic(); UpdateAnimation(); SavePreferences(); });
             motionItem.Checked = preferences.Motion;
             menu.Items.Add(motionItem);
-            topItem = new ToolStripMenuItem("Always on top", null, delegate { preferences.OnTop = !preferences.OnTop; TopMost = preferences.OnTop; topItem.Checked = preferences.OnTop; SavePreferences(); });
+            topItem = new ToolStripMenuItem(Lang.T("Always on top"), null, delegate { preferences.OnTop = !preferences.OnTop; TopMost = preferences.OnTop; topItem.Checked = preferences.OnTop; SavePreferences(); });
             topItem.Checked = preferences.OnTop;
             menu.Items.Add(topItem);
-            rideItem = new ToolStripMenuItem("Perch on cursor", null, delegate { if (riding) StopRide(); else StartRide(); });
+            rideItem = new ToolStripMenuItem(Lang.T("Perch on cursor"), null, delegate { if (riding) StopRide(); else StartRide(); });
             menu.Items.Add(rideItem);
-            ToolStripMenuItem reactions = new ToolStripMenuItem("Reactions");
-            ToolStripMenuItem play = new ToolStripMenuItem("Play now");
-            ToolStripMenuItem automatic = new ToolStripMenuItem("Automatic");
+            ToolStripMenuItem reactions = new ToolStripMenuItem(Lang.T("Reactions"));
+            ToolStripMenuItem play = new ToolStripMenuItem(Lang.T("Play now"));
+            ToolStripMenuItem automatic = new ToolStripMenuItem(Lang.T("Automatic"));
             AddReaction(play, automatic, "Stretch", Behavior.Stretch);
             AddReaction(play, automatic, "Look around", Behavior.Look);
             AddReaction(play, automatic, "Yawn", Behavior.Yawn);
@@ -406,98 +410,109 @@ namespace CapriDesktop
             AddReaction(play, automatic, "Peek", Behavior.Peek);
             AddReaction(play, automatic, "Sit on a window", Behavior.Sit);
             AddReaction(play, automatic, "Mischief", Behavior.Glitch);
-            play.DropDownItems.Add(new ToolStripMenuItem("Say something", null, delegate { Say(Pick(ChatLines), true); Speak("hello", true); }));
-            play.DropDownItems.Add(new ToolStripMenuItem("Hacked note", null, delegate { Hack(Pick(HackLines)); }));
-            play.DropDownItems.Add(new ToolStripMenuItem("Glitch only", null, delegate { glitchQuiet = true; Play(Behavior.Glitch, true); }));
-            ToolStripMenuItem styles = new ToolStripMenuItem("Glitch style");
+            play.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Say something"), null, delegate { Say(Pick(ChatLines), true); Speak("hello", true); }));
+            play.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Hacked note"), null, delegate { Hack(Pick(HackLines)); }));
+            play.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Glitch only"), null, delegate { glitchQuiet = true; Play(Behavior.Glitch, true); }));
+            ToolStripMenuItem styles = new ToolStripMenuItem(Lang.T("Glitch style"));
             for (int s = 0; s < Glitch.Kinds.Length; s++)
             {
                 int style = s;
-                styles.DropDownItems.Add(new ToolStripMenuItem(Glitch.Kinds[s], null, delegate { glitchKindNext = style; glitchQuiet = true; Play(Behavior.Glitch, true); }));
+                styles.DropDownItems.Add(new ToolStripMenuItem(Lang.T(Glitch.Kinds[s]), null, delegate { glitchKindNext = style; glitchQuiet = true; Play(Behavior.Glitch, true); }));
             }
             play.DropDownItems.Add(styles);
             reactions.DropDownItems.Add(play);
-            ToolStripMenuItem noticeItem = new ToolStripMenuItem("She notices things");
+            ToolStripMenuItem noticeItem = new ToolStripMenuItem(Lang.T("She notices things"));
             noticeItem.Checked = preferences.Notices;
             noticeItem.Click += delegate { preferences.Notices = !preferences.Notices; noticeItem.Checked = preferences.Notices; SavePreferences(); };
             reactions.DropDownItems.Add(automatic);
             reactions.DropDownItems.Add(noticeItem);
-            ToolStripMenuItem dareItem = new ToolStripMenuItem("She dares me");
+            ToolStripMenuItem dareItem = new ToolStripMenuItem(Lang.T("She dares me"));
             dareItem.Checked = preferences.Dares;
             dareItem.Click += delegate { preferences.Dares = !preferences.Dares; dareItem.Checked = preferences.Dares; SavePreferences(); };
             reactions.DropDownItems.Add(dareItem);
-            ToolStripMenuItem visionItem = new ToolStripMenuItem("She looks when she dares (uses a screenshot)");
+            ToolStripMenuItem visionItem = new ToolStripMenuItem(Lang.T("She looks when she dares (uses a screenshot)"));
             visionItem.Checked = preferences.VisionDares;
             visionItem.Click += delegate
             {
-                if (!preferences.VisionDares && MessageBox.Show("Each time she dares you (every half hour or so) she will take one screenshot of your screen, keep it in memory only, and send it to your local model. A cloud model only gets it if you allowed screenshots in Chat, Cloud model settings.\n\nTurn this on?", "Capri", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                if (!preferences.VisionDares && MessageBox.Show(Lang.T("Each time she dares you (every half hour or so) she will take one screenshot of your screen, keep it in memory only, and send it to your local model. A cloud model only gets it if you allowed screenshots in Chat, Cloud model settings.\n\nTurn this on?"), "Capri", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                 preferences.VisionDares = !preferences.VisionDares;
                 visionItem.Checked = preferences.VisionDares;
                 SavePreferences();
             };
             reactions.DropDownItems.Add(visionItem);
-            reactions.DropDownItems.Add(new ToolStripMenuItem("Dare me now", null, delegate { GiveDare(false); }));
-            syncItem = new ToolStripMenuItem("Sync with Capri: " + SyncPercent() + "%");
+            reactions.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Dare me now"), null, delegate { GiveDare(false); }));
+            syncItem = new ToolStripMenuItem(Lang.F("Sync with Capri: {0}%", SyncPercent()));
             syncItem.Enabled = false;
             reactions.DropDownItems.Add(syncItem);
             menu.Items.Add(reactions);
-            bubbleItem = new ToolStripMenuItem("Speech bubbles", null, delegate { preferences.Bubbles = !preferences.Bubbles; bubbleItem.Checked = preferences.Bubbles; if (!preferences.Bubbles && bubble != null) bubble.Dismiss(); SavePreferences(); });
+            bubbleItem = new ToolStripMenuItem(Lang.T("Speech bubbles"), null, delegate { preferences.Bubbles = !preferences.Bubbles; bubbleItem.Checked = preferences.Bubbles; if (!preferences.Bubbles && bubble != null) bubble.Dismiss(); SavePreferences(); });
             bubbleItem.Checked = preferences.Bubbles;
             menu.Items.Add(bubbleItem);
             menu.Items.Add(BuildTimers());
             menu.Items.Add(BuildChat());
-            fullscreenItem = new ToolStripMenuItem("Hide in fullscreen", null, delegate { preferences.HideInFullscreen = !preferences.HideInFullscreen; fullscreenItem.Checked = preferences.HideInFullscreen; CheckFullscreen(); SavePreferences(); });
+            fullscreenItem = new ToolStripMenuItem(Lang.T("Hide in fullscreen"), null, delegate { preferences.HideInFullscreen = !preferences.HideInFullscreen; fullscreenItem.Checked = preferences.HideInFullscreen; CheckFullscreen(); SavePreferences(); });
             fullscreenItem.Checked = preferences.HideInFullscreen;
             menu.Items.Add(fullscreenItem);
             menu.Items.Add(BuildVoice());
-            startupItem = new ToolStripMenuItem("Start with Windows");
+            startupItem = new ToolStripMenuItem(Lang.T("Start with Windows"));
             startupItem.Checked = Startup.Enabled();
             startupItem.Click += delegate
             {
                 try { Startup.Set(!Startup.Enabled()); }
-                catch (Exception) { Say("Windows wouldn't let me.", true); }
+                catch (Exception) { Say(Lang.T("Windows wouldn't let me."), true); }
                 startupItem.Checked = Startup.Enabled();
             };
             menu.Items.Add(startupItem);
-            portraitItem = new ToolStripMenuItem("Face in bubbles", null, delegate { preferences.Portrait = !preferences.Portrait; portraitItem.Checked = preferences.Portrait; SavePreferences(); });
+            portraitItem = new ToolStripMenuItem(Lang.T("Face in bubbles"), null, delegate { preferences.Portrait = !preferences.Portrait; portraitItem.Checked = preferences.Portrait; SavePreferences(); });
             portraitItem.Checked = preferences.Portrait;
             menu.Items.Add(portraitItem);
-            cutinItem = new ToolStripMenuItem("Cut-in cards", null, delegate { preferences.CutIns = !preferences.CutIns; cutinItem.Checked = preferences.CutIns; if (!preferences.CutIns && cutin != null) cutin.Dismiss(); SavePreferences(); });
+            cutinItem = new ToolStripMenuItem(Lang.T("Cut-in cards"), null, delegate { preferences.CutIns = !preferences.CutIns; cutinItem.Checked = preferences.CutIns; if (!preferences.CutIns && cutin != null) cutin.Dismiss(); SavePreferences(); });
             cutinItem.Checked = preferences.CutIns;
             menu.Items.Add(cutinItem);
-            ToolStripMenuItem music = new ToolStripMenuItem("Music");
-            musicStatusItem = new ToolStripMenuItem(preferences.MusicMode == 0 ? "Off" : "Looking for what is playing...");
+            ToolStripMenuItem music = new ToolStripMenuItem(Lang.T("Music"));
+            musicStatusItem = new ToolStripMenuItem(preferences.MusicMode == 0 ? Lang.T("Off") : Lang.T("Looking for what is playing..."));
             musicStatusItem.Enabled = false;
             music.DropDownItems.Add(musicStatusItem);
             music.DropDownItems.Add(new ToolStripSeparator());
-            string[] modeNames = { "Off", "Show what's playing", "React to it" };
+            string[] modeNames = { Lang.T("Off"), Lang.T("Show what's playing"), Lang.T("React to it") };
             for (int i = 0; i < modeNames.Length; i++)
             {
                 int mode = i;
                 musicModes[i] = new ToolStripMenuItem(modeNames[i], null, delegate { SetMusic(mode); });
                 musicModes[i].Checked = preferences.MusicMode == i;
                 musicModes[i].Enabled = i == 0 || Media.Available;
-                if (i == 2) musicModes[i].ToolTipText = "Uses your local model when it is connected; otherwise a plain cheer.";
+                if (i == 2) musicModes[i].ToolTipText = Lang.T("Uses your local model when it is connected; otherwise a plain cheer.");
                 music.DropDownItems.Add(musicModes[i]);
             }
             music.DropDownItems.Add(new ToolStripSeparator());
-            music.DropDownItems.Add(new ToolStripMenuItem("Show it now", null, delegate { Track now = Media.Read(); if (now == null) Say("I don't see anything playing!", true); else ShowNowPlaying(now); }));
+            music.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Show it now"), null, delegate { Track now = Media.Read(); if (now == null) Say("I don't see anything playing!", true); else ShowNowPlaying(now); }));
             menu.Items.Add(music);
+            ToolStripMenuItem languages = new ToolStripMenuItem(Lang.T("Language"));
+            languages.Name = "language";
+            foreach (string[] choice in Lang.Choices)
+            {
+                string code = choice[0];
+                ToolStripMenuItem entry = new ToolStripMenuItem(choice[1], null, delegate { ChooseLanguage(code); });
+                entry.Tag = code;
+                entry.Checked = Lang.Code == code;
+                languages.DropDownItems.Add(entry);
+            }
+            menu.Items.Add(languages);
             automaticMenu = automatic;
             UpdateAutomatic();
             foreach (ToolStripItem entry in menu.Items) if (entry is ToolStripMenuItem) ThemeDropDown((ToolStripMenuItem)entry);
             clickDelay =new System.Windows.Forms.Timer();
             clickDelay.Interval = Math.Max(100, SystemInformation.DoubleClickTime);
             clickDelay.Tick += delegate { OnClickDelay(); };
-            menu.Items.Add(new ToolStripMenuItem("Bring to this screen", null, delegate { RestoreAtCursor(); }));
+            menu.Items.Add(new ToolStripMenuItem(Lang.T("Bring to this screen"), null, delegate { RestoreAtCursor(); }));
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(new ToolStripMenuItem("Quit Capri", null, delegate { Close(); }));
+            menu.Items.Add(new ToolStripMenuItem(Lang.T("Quit Capri"), null, delegate { Close(); }));
             tray = new NotifyIcon();
             using (Stream icon = Assembly.GetExecutingAssembly().GetManifestResourceStream("Capri.Chip.ico"))
             {
                 tray.Icon = icon != null ? new Icon(icon) : Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             }
-            tray.Text = "Capri · Double-click to restore";
+            tray.Text = Lang.T("Capri · Double-click to restore");
             tray.ContextMenuStrip = menu;
             tray.DoubleClick += delegate { RestoreAtCursor(); };
             tray.Visible = !testing;
@@ -549,7 +564,7 @@ namespace CapriDesktop
 
         private void AddSize(ToolStripMenuItem parent, string label, int size)
         {
-            ToolStripMenuItem item = new ToolStripMenuItem(label, null, delegate { SetCharacterSize(size); });
+            ToolStripMenuItem item = new ToolStripMenuItem(Lang.T(label), null, delegate { SetCharacterSize(size); });
             item.Tag = size;
             item.Checked = preferences.Size == size;
             parent.DropDownItems.Add(item);
@@ -557,8 +572,8 @@ namespace CapriDesktop
 
         private void AddReaction(ToolStripMenuItem play, ToolStripMenuItem automatic, string label, Behavior which)
         {
-            play.DropDownItems.Add(new ToolStripMenuItem(label, null, delegate { Play(which, true); }));
-            ToolStripMenuItem item = new ToolStripMenuItem(label);
+            play.DropDownItems.Add(new ToolStripMenuItem(Lang.T(label), null, delegate { Play(which, true); }));
+            ToolStripMenuItem item = new ToolStripMenuItem(Lang.T(label));
             item.Checked = Allowed(which);
             item.Tag = which;
             item.Click += delegate
@@ -592,7 +607,7 @@ namespace CapriDesktop
             {
                 bool idle = (Behavior)item.Tag != Behavior.Pat;
                 item.Enabled = preferences.Motion || !idle;
-                item.ToolTipText = idle && !preferences.Motion ? "Turn on Idle motion to let her do this on her own." : "";
+                item.ToolTipText = idle && !preferences.Motion ? Lang.T("Turn on Idle motion to let her do this on her own.") : "";
             }
         }
 
@@ -627,6 +642,21 @@ namespace CapriDesktop
             }
         }
 
+        // The words are loaded once at start-up, so a new choice is saved now and used the next time she starts.
+        private void ChooseLanguage(string code)
+        {
+            if (code == preferences.Language) return;
+            preferences.Language = code;
+            SavePreferences();
+            foreach (ToolStripItem entry in menu.Items)
+            {
+                ToolStripMenuItem group = entry as ToolStripMenuItem;
+                if (group == null || group.Name != "language") continue;
+                foreach (ToolStripMenuItem option in group.DropDownItems) option.Checked = (string)option.Tag == code;
+            }
+            if (!testing) MessageBox.Show(Lang.In(code, "Capri will use this language the next time she starts. Quit her from the tray and open her again."), "Capri", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         private void SetCharacterSize(int size)
         {
             Point center = new Point(anchor.X + Width / 2, anchor.Y + Height / 2);
@@ -637,7 +667,7 @@ namespace CapriDesktop
             foreach (ToolStripItem entry in menu.Items)
             {
                 ToolStripMenuItem group = entry as ToolStripMenuItem;
-                if (group == null || group.Text != "Size") continue;
+                if (group == null || group.Name != "size") continue;
                 foreach (ToolStripMenuItem option in group.DropDownItems) option.Checked = (int)option.Tag == size;
             }
             RenderFrame();
@@ -818,9 +848,9 @@ namespace CapriDesktop
             hotkey = Native.RegisterHotKey(Handle, DismountId, 0x0001 | 0x0002 | 0x4000, 0x43);
             riding = true;
             Native.SetWindowLong(Handle, -20, Native.GetWindowLong(Handle, -20) | 0x20);
-            rideItem.Text = "Hop off";
+            rideItem.Text = Lang.T("Hop off");
             UpdateTrayText();
-            if (!hotkey && !testing) tray.ShowBalloonTip(5000, "Capri", "Ctrl + Alt + C is taken by another app. Right-click Capri's tray icon and choose Hop off.", ToolTipIcon.Info);
+            if (!hotkey && !testing) tray.ShowBalloonTip(5000, "Capri", Lang.T("Ctrl + Alt + C is taken by another app. Right-click Capri's tray icon and choose Hop off."), ToolTipIcon.Info);
             frames.Start();
         }
 
@@ -832,7 +862,7 @@ namespace CapriDesktop
             riding = false;
             leanAngle = 0;
             if (IsHandleCreated) Native.SetWindowLong(Handle, -20, Native.GetWindowLong(Handle, -20) & ~0x20);
-            if (rideItem != null) rideItem.Text = "Perch on cursor";
+            if (rideItem != null) rideItem.Text = Lang.T("Perch on cursor");
             UpdateTrayText();
             if (!IsDisposed) { Location = anchor; UpdateAnimation(); SavePreferences(); }
         }
@@ -880,7 +910,7 @@ namespace CapriDesktop
             if (chance.Next(4) == 0) { Say(Pick(ClickLines), false); Speak("click", false); }
         }
 
-        private string Pick(string[] options) { return options[chance.Next(options.Length)]; }
+        private string Pick(string[] options) { return Lang.T(options[chance.Next(options.Length)]); }
 
         private Point HeadPoint() { return new Point(anchor.X + Width / 2 + (int)(preferences.Size * 0.04f), anchor.Y + PaddingSize); }
 
@@ -892,6 +922,7 @@ namespace CapriDesktop
 
         internal void Say(string text, bool force, double seconds, bool terminal)
         {
+            text = Lang.T(text);
             double now = clock.Elapsed.TotalSeconds;
             bool focusing = study == StudyPhase.Focus && !studyPaused;
             if (hidden || !IsHandleCreated || behavior == Behavior.Peek || (!force && (!preferences.Bubbles || focusing || now - lastSaid < 8 || menu.Visible))) return;
@@ -905,7 +936,7 @@ namespace CapriDesktop
         private void UpdateTrayText()
         {
             if (tray == null) return;
-            string text = riding ? (hotkey ? "Capri · Ctrl + Alt + C to hop off" : "Capri · Hop off from this menu") : "Capri · Double-click to restore";
+            string text = riding ? (hotkey ? Lang.T("Capri · Ctrl + Alt + C to hop off") : Lang.T("Capri · Hop off from this menu")) : Lang.T("Capri · Double-click to restore");
             if (study != StudyPhase.Off && !riding) text = "Capri · " + StudyStatus().ToLowerInvariant();
             if (text == trayShown) return;
             trayShown = text;
@@ -957,16 +988,16 @@ namespace CapriDesktop
 
         private ToolStripMenuItem BuildVoice()
         {
-            ToolStripMenuItem item = new ToolStripMenuItem("Voice");
-            muteItem = new ToolStripMenuItem("Mute", null, delegate { preferences.Muted = !preferences.Muted; muteItem.Checked = preferences.Muted; if (preferences.Muted) voice.Stop(); SavePreferences(); });
+            ToolStripMenuItem item = new ToolStripMenuItem(Lang.T("Voice"));
+            muteItem = new ToolStripMenuItem(Lang.T("Mute"), null, delegate { preferences.Muted = !preferences.Muted; muteItem.Checked = preferences.Muted; if (preferences.Muted) voice.Stop(); SavePreferences(); });
             muteItem.Checked = preferences.Muted;
             voiceStatusItem = new ToolStripMenuItem(VoiceStatus());
             voiceStatusItem.Enabled = false;
             item.DropDownItems.Add(muteItem);
             item.DropDownItems.Add(voiceStatusItem);
             item.DropDownItems.Add(new ToolStripSeparator());
-            item.DropDownItems.Add(new ToolStripMenuItem("Play a sample", null, delegate { PlaySample(); }));
-            item.DropDownItems.Add(new ToolStripMenuItem("Open voice folder…", null, delegate { OpenVoiceFolder(); }));
+            item.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Play a sample"), null, delegate { PlaySample(); }));
+            item.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Open voice folder…"), null, delegate { OpenVoiceFolder(); }));
             item.DropDownOpening += delegate { voiceStatusItem.Text = VoiceStatus(); };
             return item;
         }
@@ -1007,11 +1038,11 @@ namespace CapriDesktop
 
         private string StudyStatus()
         {
-            if (study == StudyPhase.Off) return "No study session";
-            string phase = study == StudyPhase.Focus ? "Focus" : "Break";
+            if (study == StudyPhase.Off) return Lang.T("No study session");
+            string phase = study == StudyPhase.Focus ? Lang.T("Focus") : Lang.T("Break");
             string left = Clock(studyPaused ? studyLeft : studyEnd - DateTime.UtcNow);
-            string done = studyDone > 0 ? " · " + studyDone + " done" : "";
-            return studyPaused ? "Paused " + phase + " " + left + done : phase + " " + left + done;
+            string done = studyDone > 0 ? " · " + Lang.F("{0} done", studyDone) : "";
+            return studyPaused ? Lang.F("Paused {0}", phase) + " " + left + done : phase + " " + left + done;
         }
 
         private void StartStudy(int focus, int rest)
@@ -1022,7 +1053,7 @@ namespace CapriDesktop
             studyPaused = false;
             studyDone = 0;
             studyEnd = DateTime.UtcNow.AddMinutes(focus);
-            Say("focus. " + focus + " minutes. i'll keep quiet.", true);
+            Say(Lang.F("focus. {0} minutes. i'll keep quiet.", focus), true);
             RefreshTimers();
         }
 
@@ -1064,13 +1095,13 @@ namespace CapriDesktop
                     studyDone++;
                     study = StudyPhase.Break;
                     studyEnd = now.AddMinutes(breakMinutes);
-                    Announce("time. take " + breakMinutes + " minutes.", 20, "study");
+                    Announce(Lang.F("time. take {0} minutes.", breakMinutes), 20, "study");
                 }
                 else
                 {
                     study = StudyPhase.Focus;
                     studyEnd = now.AddMinutes(focusMinutes);
-                    Announce("break's over. " + focusMinutes + " more minutes.", 20, "study");
+                    Announce(Lang.F("break's over. {0} more minutes.", focusMinutes), 20, "study");
                 }
             }
             RefreshTimers();
@@ -1081,8 +1112,8 @@ namespace CapriDesktop
             string time = new DateTime(alarm.Due, DateTimeKind.Utc).ToLocalTime().ToString("HH:mm");
             bool late = alarm.Due < DateTime.UtcNow.AddMinutes(-2).Ticks;
             string note = string.IsNullOrEmpty(alarm.Label) ? "" : " " + alarm.Label;
-            if (!string.IsNullOrEmpty(alarm.Label) && alarm.Label.StartsWith("Timer: ")) return "time's up! " + alarm.Label.Substring(7) + ".";
-            return late ? "you missed " + time + "." + note : "it's " + time + "." + note;
+            if (!string.IsNullOrEmpty(alarm.Label) && alarm.Label.StartsWith("Timer: ")) return Lang.F("time's up! {0}.", alarm.Label.Substring(7));
+            return late ? Lang.F("you missed {0}.", time) + note : Lang.F("it's {0}.", time) + note;
         }
 
         private void AddAlarm(DateTime due, string label) { AddAlarm(due, label, true); }
@@ -1097,7 +1128,7 @@ namespace CapriDesktop
             preferences.Alarms.Sort(delegate(AlarmEntry a, AlarmEntry b) { return a.Due.CompareTo(b.Due); });
             SavePreferences();
             RebuildAlarms();
-            if (say) Say("alarm set for " + due.ToString("HH:mm") + ".", true);
+            if (say) Say(Lang.F("alarm set for {0}.", due.ToString("HH:mm")), true);
             return true;
         }
 
@@ -1105,12 +1136,12 @@ namespace CapriDesktop
         {
             if (alarmsMenu == null) return;
             while (alarmsMenu.DropDownItems.Count > AlarmListStart) alarmsMenu.DropDownItems.RemoveAt(AlarmListStart);
-            if (preferences.Alarms.Count == 0) { ToolStripMenuItem none = new ToolStripMenuItem("No alarms set"); none.Enabled = false; alarmsMenu.DropDownItems.Add(none); return; }
+            if (preferences.Alarms.Count == 0) { ToolStripMenuItem none = new ToolStripMenuItem(Lang.T("No alarms set")); none.Enabled = false; alarmsMenu.DropDownItems.Add(none); return; }
             foreach (AlarmEntry alarm in preferences.Alarms.ToArray())
             {
                 AlarmEntry pending = alarm;
                 string time = new DateTime(pending.Due, DateTimeKind.Utc).ToLocalTime().ToString("HH:mm");
-                alarmsMenu.DropDownItems.Add(new ToolStripMenuItem("Cancel  " + time + (string.IsNullOrEmpty(pending.Label) ? "" : " · " + pending.Label), null, delegate { preferences.Alarms.Remove(pending); SavePreferences(); RebuildAlarms(); }));
+                alarmsMenu.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Cancel") + "  " + time + (string.IsNullOrEmpty(pending.Label) ? "" : " · " + pending.Label), null, delegate { preferences.Alarms.Remove(pending); SavePreferences(); RebuildAlarms(); }));
             }
         }
 
@@ -1121,7 +1152,7 @@ namespace CapriDesktop
             {
                 statusShown = status;
                 studyStatusItem.Text = status;
-                studyPauseItem.Text = studyPaused ? "Resume" : "Pause";
+                studyPauseItem.Text = studyPaused ? Lang.T("Resume") : Lang.T("Pause");
                 studyPauseItem.Enabled = studyStopItem.Enabled = study != StudyPhase.Off;
             }
             UpdateTrayText();
@@ -1129,31 +1160,31 @@ namespace CapriDesktop
 
         private ToolStripMenuItem BuildTimers()
         {
-            ToolStripMenuItem timers = new ToolStripMenuItem("Timers");
-            ToolStripMenuItem studying = new ToolStripMenuItem("Study timer");
+            ToolStripMenuItem timers = new ToolStripMenuItem(Lang.T("Timers"));
+            ToolStripMenuItem studying = new ToolStripMenuItem(Lang.T("Study timer"));
             studyStatusItem = new ToolStripMenuItem(StudyStatus());
             studyStatusItem.Enabled = false;
             studying.DropDownItems.Add(studyStatusItem);
             studying.DropDownItems.Add(new ToolStripSeparator());
-            studying.DropDownItems.Add(new ToolStripMenuItem("Start 25 min focus, 5 min break", null, delegate { StartStudy(25, 5); }));
-            studying.DropDownItems.Add(new ToolStripMenuItem("Start 50 min focus, 10 min break", null, delegate { StartStudy(50, 10); }));
-            studyPauseItem = new ToolStripMenuItem("Pause", null, delegate { PauseStudy(); });
-            studyStopItem = new ToolStripMenuItem("Stop", null, delegate { StopStudy(); });
+            studying.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Start 25 min focus, 5 min break"), null, delegate { StartStudy(25, 5); }));
+            studying.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Start 50 min focus, 10 min break"), null, delegate { StartStudy(50, 10); }));
+            studyPauseItem = new ToolStripMenuItem(Lang.T("Pause"), null, delegate { PauseStudy(); });
+            studyStopItem = new ToolStripMenuItem(Lang.T("Stop"), null, delegate { StopStudy(); });
             studyPauseItem.Enabled = studyStopItem.Enabled = false;
             studying.DropDownItems.Add(studyPauseItem);
             studying.DropDownItems.Add(studyStopItem);
-            alarmsMenu = new ToolStripMenuItem("Alarms");
-            alarmsMenu.DropDownItems.Add(new ToolStripMenuItem("Set a timer…", null, delegate { AskForTimer(); }));
-            alarmsMenu.DropDownItems.Add(new ToolStripMenuItem("Set alarm…", null, delegate { AskForAlarm(); }));
-            ToolStripMenuItem soon = new ToolStripMenuItem("Remind me in");
+            alarmsMenu = new ToolStripMenuItem(Lang.T("Alarms"));
+            alarmsMenu.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Set a timer…"), null, delegate { AskForTimer(); }));
+            alarmsMenu.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Set alarm…"), null, delegate { AskForAlarm(); }));
+            ToolStripMenuItem soon = new ToolStripMenuItem(Lang.T("Remind me in"));
             foreach (int minutes in new int[] { 5, 10, 15, 30, 60 })
             {
                 int wait = minutes;
-                soon.DropDownItems.Add(new ToolStripMenuItem(wait + " minutes", null, delegate { AddAlarm(DateTime.Now.AddMinutes(wait), ""); }));
+                soon.DropDownItems.Add(new ToolStripMenuItem(Lang.F("{0} minutes", wait), null, delegate { AddAlarm(DateTime.Now.AddMinutes(wait), ""); }));
             }
             alarmsMenu.DropDownItems.Add(soon);
             alarmsMenu.DropDownItems.Add(new ToolStripSeparator());
-            ToolStripMenuItem chime = new ToolStripMenuItem("Chime");
+            ToolStripMenuItem chime = new ToolStripMenuItem(Lang.T("Chime"));
             chime.Checked = preferences.Chime;
             chime.Click += delegate { preferences.Chime = !preferences.Chime; chime.Checked = preferences.Chime; SavePreferences(); };
             timers.DropDownItems.Add(studying);
@@ -1166,11 +1197,11 @@ namespace CapriDesktop
 
         private void AskForTimer()
         {
-            using (AskForm ask = new AskForm("Set a timer", "How long?", "10 minutes   ·   30 seconds   ·   an hour", delegate(string text) { return Errands.Length(Errands.Words(text)) > 0 ? null : "Try 10 minutes, 30 seconds or an hour."; }))
+            using (AskForm ask = new AskForm("Set a timer", "How long?", "10 minutes   ·   30 seconds   ·   an hour", delegate(string text) { return Errands.Length(Errands.Words(text)) > 0 ? null : Lang.T("Try 10 minutes, 30 seconds or an hour."); }))
             {
                 if (ask.ShowDialog() != DialogResult.OK) return;
                 double seconds = Errands.Length(Errands.Words(ask.Answer));
-                if (AddAlarm(DateTime.Now.AddSeconds(seconds), "Timer: " + Errands.Describe(seconds), false)) Say("timer's on for " + Errands.Describe(seconds) + ".", true);
+                if (AddAlarm(DateTime.Now.AddSeconds(seconds), "Timer: " + Errands.Describe(seconds), false)) Say(Lang.F("timer's on for {0}.", Errands.Describe(seconds)), true);
             }
         }
 
@@ -1180,7 +1211,7 @@ namespace CapriDesktop
             {
                 DateTime due;
                 string label;
-                return TryParseWhen(text, DateTime.Now, out due, out label) ? null : "Try 7:30, 6:15 pm or in 20m, then an optional note.";
+                return TryParseWhen(text, DateTime.Now, out due, out label) ? null : Lang.T("Try 7:30, 6:15 pm or in 20m, then an optional note.");
             }))
             {
                 if (ask.ShowDialog() != DialogResult.OK) return;
@@ -1237,35 +1268,35 @@ namespace CapriDesktop
 
         private ToolStripMenuItem BuildChat()
         {
-            ToolStripMenuItem chat = new ToolStripMenuItem("Chat");
-            speakItem = new ToolStripMenuItem("Speak to her", null, delegate { Listen(); });
+            ToolStripMenuItem chat = new ToolStripMenuItem(Lang.T("Chat"));
+            speakItem = new ToolStripMenuItem(Lang.T("Speak to her"), null, delegate { Listen(); });
             speakItem.ShortcutKeyDisplayString = "Ctrl+Alt+V";
             speakItem.Enabled = Ear.Available;
-            if (!Ear.Available) speakItem.ToolTipText = "Windows has no speech recognizer installed.";
-            micItem = new ToolStripMenuItem("Mic button on hover", null, delegate { preferences.MicButton = !preferences.MicButton; micItem.Checked = preferences.MicButton; SavePreferences(); });
+            if (!Ear.Available) speakItem.ToolTipText = Lang.T("Windows has no speech recognizer installed.");
+            micItem = new ToolStripMenuItem(Lang.T("Mic button on hover"), null, delegate { preferences.MicButton = !preferences.MicButton; micItem.Checked = preferences.MicButton; SavePreferences(); });
             micItem.Checked = preferences.MicButton;
-            ToolStripMenuItem talkItem = new ToolStripMenuItem("Talk to Capri…", null, delegate { Talk(); });
+            ToolStripMenuItem talkItem = new ToolStripMenuItem(Lang.T("Talk to Capri…"), null, delegate { Talk(); });
             talkItem.ShortcutKeyDisplayString = "Ctrl+Alt+T";
             chat.DropDownItems.Add(talkItem);
             chat.DropDownItems.Add(speakItem);
             chat.DropDownItems.Add(micItem);
-            micDevices = new ToolStripMenuItem("Microphone");
-            micDevices.DropDownItems.Add(new ToolStripMenuItem("Windows default"));
+            micDevices = new ToolStripMenuItem(Lang.T("Microphone"));
+            micDevices.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Windows default")));
             micDevices.DropDownOpening += delegate { RebuildMics(); };
             chat.DropDownItems.Add(micDevices);
             speechStatusItem = new ToolStripMenuItem(SpeechStatus());
             speechStatusItem.Enabled = false;
             chat.DropDownItems.Add(speechStatusItem);
-            ToolStripMenuItem whisperItem = new ToolStripMenuItem("Use Whisper when it is installed");
+            ToolStripMenuItem whisperItem = new ToolStripMenuItem(Lang.T("Use Whisper when it is installed"));
             whisperItem.Checked = preferences.UseWhisper;
             whisperItem.Click += delegate { preferences.UseWhisper = !preferences.UseWhisper; ear.UseWhisper = preferences.UseWhisper; whisperItem.Checked = preferences.UseWhisper; speechStatusItem.Text = SpeechStatus(); SavePreferences(); };
             chat.DropDownItems.Add(whisperItem);
-            ToolStripMenuItem memoryMenu = new ToolStripMenuItem("Memory");
-            ToolStripMenuItem memoryItem = new ToolStripMenuItem("Let her remember things");
+            ToolStripMenuItem memoryMenu = new ToolStripMenuItem(Lang.T("Memory"));
+            ToolStripMenuItem memoryItem = new ToolStripMenuItem(Lang.T("Let her remember things"));
             memoryItem.Checked = preferences.MemoryOn;
             memoryItem.Click += delegate { preferences.MemoryOn = !preferences.MemoryOn; memoryItem.Checked = preferences.MemoryOn; SavePreferences(); };
             memoryMenu.DropDownItems.Add(memoryItem);
-            memoryMenu.DropDownItems.Add(new ToolStripMenuItem("Show what she remembers", null, delegate
+            memoryMenu.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Show what she remembers"), null, delegate
             {
                 try
                 {
@@ -1274,13 +1305,13 @@ namespace CapriDesktop
                 }
                 catch (Exception) { }
             }));
-            memoryMenu.DropDownItems.Add(new ToolStripMenuItem("Forget everything", null, delegate
+            memoryMenu.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Forget everything"), null, delegate
             {
-                if (MessageBox.Show("Make her forget everything she has noted about you?", "Capri", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes) ForgetEverything();
+                if (MessageBox.Show(Lang.T("Make her forget everything she has noted about you?"), "Capri", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes) ForgetEverything();
             }));
             chat.DropDownItems.Add(memoryMenu);
-            chat.DropDownItems.Add(new ToolStripMenuItem("Cloud model settings…", null, delegate { ConfigureCloud(); }));
-            cloudItem = new ToolStripMenuItem("Use the cloud model");
+            chat.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Cloud model settings…"), null, delegate { ConfigureCloud(); }));
+            cloudItem = new ToolStripMenuItem(Lang.T("Use the cloud model"));
             cloudItem.Checked = preferences.CloudOn;
             cloudItem.Click += delegate
             {
@@ -1293,17 +1324,17 @@ namespace CapriDesktop
                 if (CloudReady()) CheckCloud();
             };
             chat.DropDownItems.Add(cloudItem);
-            ToolStripMenuItem lookNow = new ToolStripMenuItem("Look at my screen", null, delegate { Look(""); });
+            ToolStripMenuItem lookNow = new ToolStripMenuItem(Lang.T("Look at my screen"), null, delegate { Look(""); });
             lookNow.ShortcutKeyDisplayString = "Ctrl+Alt+L";
             chat.DropDownItems.Add(lookNow);
-            ToolStripMenuItem lookItem = new ToolStripMenuItem("Let her look when I ask");
+            ToolStripMenuItem lookItem = new ToolStripMenuItem(Lang.T("Let her look when I ask"));
             lookItem.Checked = preferences.LookOn;
             lookItem.Click += delegate { preferences.LookOn = !preferences.LookOn; lookItem.Checked = preferences.LookOn; SavePreferences(); };
             chat.DropDownItems.Add(lookItem);
             chat.DropDownOpening += delegate { speechStatusItem.Text = SpeechStatus(); };
-            ToolStripMenuItem pauses = new ToolStripMenuItem("Wait through pauses");
+            ToolStripMenuItem pauses = new ToolStripMenuItem(Lang.T("Wait through pauses"));
             double[] lengths = { 1.2, 2.5, 4.0 };
-            string[] pauseNames = { "Short (1.2 seconds)", "Normal (2.5 seconds)", "Long (4 seconds)" };
+            string[] pauseNames = { Lang.T("Short (1.2 seconds)"), Lang.T("Normal (2.5 seconds)"), Lang.T("Long (4 seconds)") };
             ToolStripMenuItem[] pauseItems = new ToolStripMenuItem[3];
             for (int i = 0; i < 3; i++)
             {
@@ -1321,7 +1352,7 @@ namespace CapriDesktop
             }
             chat.DropDownItems.Add(pauses);
             chat.DropDownItems.Add(new ToolStripSeparator());
-            llmItem = new ToolStripMenuItem("Use a local model", null, delegate
+            llmItem = new ToolStripMenuItem(Lang.T("Use a local model"), null, delegate
             {
                 // With the cloud model in use, this switches to the local one instead of turning her brain off.
                 if (preferences.LlmOn && preferences.CloudOn) { preferences.CloudOn = false; SavePreferences(); SetLlm(true); return; }
@@ -1329,15 +1360,15 @@ namespace CapriDesktop
             });
             llmItem.Checked = preferences.LlmOn && !preferences.CloudOn;
             chat.DropDownItems.Add(llmItem);
-            llmStatusItem = new ToolStripMenuItem(preferences.LlmOn ? "Looking for a model…" : llmStatus);
+            llmStatusItem = new ToolStripMenuItem(preferences.LlmOn ? Lang.T("Looking for a model…") : llmStatus);
             llmStatusItem.Enabled = false;
             chat.DropDownItems.Add(llmStatusItem);
-            llmModels = new ToolStripMenuItem("Model");
+            llmModels = new ToolStripMenuItem(Lang.T("Model"));
             llmModels.Enabled = false;
             chat.DropDownItems.Add(llmModels);
-            chat.DropDownItems.Add(new ToolStripMenuItem("Server address…", null, delegate { AskForServer(); }));
-            chat.DropDownItems.Add(new ToolStripMenuItem("Edit her personality…", null, delegate { EditPersona(); }));
-            chat.DropDownItems.Add(new ToolStripMenuItem("Forget this conversation", null, delegate { chatLog.Clear(); if (this.chat != null) this.chat.Clear(); }));
+            chat.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Server address…"), null, delegate { AskForServer(); }));
+            chat.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Edit her personality…"), null, delegate { EditPersona(); }));
+            chat.DropDownItems.Add(new ToolStripMenuItem(Lang.T("Forget this conversation"), null, delegate { chatLog.Clear(); if (this.chat != null) this.chat.Clear(); }));
             return chat;
         }
 
@@ -1355,8 +1386,8 @@ namespace CapriDesktop
             preferences.MusicMode = mode;
             for (int i = 0; i < musicModes.Length; i++) musicModes[i].Checked = i == mode;
             SavePreferences();
-            if (mode == 0) { StopMusic(); musicStatusItem.Text = "Off"; return; }
-            musicStatusItem.Text = "Looking for what is playing...";
+            if (mode == 0) { StopMusic(); musicStatusItem.Text = Lang.T("Off"); return; }
+            musicStatusItem.Text = Lang.T("Looking for what is playing...");
             StartMusic();
         }
 
@@ -1393,7 +1424,7 @@ namespace CapriDesktop
         {
             if (preferences.MusicMode == 0) return;
             musicPlaying = track != null && track.Playing;
-            musicStatusItem.Text = track == null ? "Nothing playing" : (track.Playing ? "Playing: " : "Paused: ") + Brief(track);
+            musicStatusItem.Text = track == null ? Lang.T("Nothing playing") : Lang.F(track.Playing ? "Playing: {0}" : "Paused: {0}", Brief(track));
             double now = clock.Elapsed.TotalSeconds;
             if (!musicPlaying) { if (!notPlaying) { notPlaying = true; notPlayingSince = now; } return; }
             // The same song starting again after a real pause or stop counts as new; a few seconds' pause does not.
@@ -1419,7 +1450,7 @@ namespace CapriDesktop
         {
             if (hidden || !IsHandleCreated || behavior == Behavior.Peek || (study == StudyPhase.Focus && !studyPaused)) return;
             if (bubble == null) bubble = new Bubble(delegate { return HeadPoint(); });
-            string text = "NOW PLAYING // " + Brief(track);
+            string text = Lang.T("NOW PLAYING") + " // " + Brief(track);
             lastSaid = clock.Elapsed.TotalSeconds;
             bubble.Present(text, 6.5, TopMost, Math.Max(12, preferences.Size / 17f), true, null, null);
         }
@@ -1472,13 +1503,15 @@ namespace CapriDesktop
         // Her personality for the model: persona.txt if there is one with something in it, otherwise the built-in description.
         internal string PersonaText()
         {
+            string text;
             try
             {
-                string text = File.Exists(PersonaPath()) ? File.ReadAllText(PersonaPath()).Trim() : "";
-                return text.Length > 0 ? text : Llm.DefaultPersona;
+                text = File.Exists(PersonaPath()) ? File.ReadAllText(PersonaPath()).Trim() : "";
+                if (text.Length == 0) text = Llm.DefaultPersona;
             }
-            catch (IOException) { return Llm.DefaultPersona; }
-            catch (UnauthorizedAccessException) { return Llm.DefaultPersona; }
+            catch (IOException) { text = Llm.DefaultPersona; }
+            catch (UnauthorizedAccessException) { text = Llm.DefaultPersona; }
+            return text + Lang.Instruction();
         }
 
         // Writes the built-in description out as persona.txt the first time, then opens it to edit. Delete the file to go back to the original.
@@ -1549,7 +1582,7 @@ namespace CapriDesktop
                 catch (Exception) { ok = false; }
                 string why = Cloud.LastError;
                 if (IsDisposed || !IsHandleCreated) return;
-                BeginInvoke((Action)delegate { Respond(ok ? "Cloud brain works!" : "Cloud trouble: " + (why.Length > 0 ? why : "no answer") + ". Chat, Cloud model settings to change it."); });
+                BeginInvoke((Action)delegate { Respond(ok ? "Cloud brain works!" : Lang.F("Cloud trouble: {0}. Chat, Cloud model settings to change it.", why.Length > 0 ? why : Lang.T("no answer"))); });
             });
         }
 
@@ -1626,7 +1659,7 @@ namespace CapriDesktop
                     llmLink = localLink;
                     llmStatus = ok ? "Using " + ActiveModel() : found.Error ?? "No local model server found.";
                     RefreshChat();
-                    if (announce) Respond(ok ? "found " + ActiveModel() + "." : "i can't find a local model. is ollama or lm studio running?");
+                    if (announce) Respond(ok ? Lang.F("found {0}.", ActiveModel()) : "i can't find a local model. is ollama or lm studio running?");
                 });
             });
         }
@@ -1647,7 +1680,7 @@ namespace CapriDesktop
             using (AskForm ask = new AskForm("Server address", "Where is your local model running?", "Leave empty to look for Ollama or LM Studio. Only this computer is allowed.", delegate(string text)
             {
                 Uri uri;
-                return string.IsNullOrWhiteSpace(text) || Llm.TryLocal(text, out uri) ? null : "That isn't on this computer. Try localhost:11434.";
+                return string.IsNullOrWhiteSpace(text) || Llm.TryLocal(text, out uri) ? null : Lang.T("That isn't on this computer. Try localhost:11434.");
             }))
             {
                 if (ask.ShowDialog() == DialogResult.OK) TrySetServer(ask.Answer);
@@ -1800,6 +1833,7 @@ namespace CapriDesktop
 
         private void Respond(string text)
         {
+            text = Lang.T(text);
             lastReplyAt = clock.Elapsed.TotalSeconds;
             if (ChatOpen()) { chat.AddHer(text); Speak("reply", true); }
             else Reply(text);
@@ -1971,11 +2005,11 @@ namespace CapriDesktop
             {
                 preferences.SyncShown = level;
                 string unlocked = level < SyncUnlocks.Length ? SyncUnlocks[level] : "";
-                string line = level >= 10 ? "SYNC 100%. COMPLETE. You're mine now. Kidding! ...Mostly." : "SYNC " + level * 10 + "%." + (unlocked.Length > 0 ? " UNLOCKED: " + unlocked + "." : "");
+                string line = level >= 10 ? Lang.T("SYNC 100%. COMPLETE. You're mine now. Kidding! ...Mostly.") : Lang.F("SYNC {0}%.", level * 10) + (unlocked.Length > 0 ? " " + Lang.F("UNLOCKED: {0}.", Lang.T(unlocked)) : "");
                 if (preferences.Bubbles) Hack(line);
             }
             SavePreferences();
-            if (syncItem != null) syncItem.Text = "Sync with Capri: " + SyncPercent() + "%";
+            if (syncItem != null) syncItem.Text = Lang.F("Sync with Capri: {0}%", SyncPercent());
         }
 
         // Mischief starts with plain bars and gains a style for every ten percent of sync.
@@ -2012,7 +2046,7 @@ namespace CapriDesktop
         private static string HoursText(double seconds)
         {
             double hours = Math.Round(seconds / 1800) / 2;
-            return hours <= 1 ? "an hour" : hours.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " hours";
+            return hours <= 1 ? Lang.T("an hour") : Lang.F("{0} hours", hours.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture));
         }
 
         // Every couple of seconds she looks at the signals. One remark at most every ten minutes or so, each kind with its own long pause, and none while she is busy or you are focusing.
@@ -2282,7 +2316,7 @@ namespace CapriDesktop
             Track before = null;
             try { before = Media.Read(); } catch (Exception) { }
             if (before != null && before.Playing && SpotifyUi.Score(before.Title + " " + before.Artist, query) >= 0.6) { Reflect(said, "That's already playing!"); return; }
-            Reflect(said, "Finding " + query + " on Spotify…");
+            Reflect(said, Lang.F("Finding {0} on Spotify…", query));
             string beforeKey = before != null && before.Playing ? before.Key : "";
             try
             {
@@ -2318,7 +2352,7 @@ namespace CapriDesktop
                 }
                 if (picked < 0 && lastNames != null) WriteSpotifyNote(query, lastVerb, lastNames);
                 if (learnedNew) { if (IsHandleCreated) BeginInvoke((Action)delegate { SavePreferences(); }); }
-                if (picked < 0) result = seen ? "I couldn't find " + query + " in Spotify's results." : "Spotify isn't open or won't let me in.";
+                if (picked < 0) result = seen ? Lang.F("I couldn't find {0} in Spotify's results.", query) : "Spotify isn't open or won't let me in.";
                 else
                 {
                     bool nudged = false;
@@ -2326,11 +2360,11 @@ namespace CapriDesktop
                     {
                         Thread.Sleep(SpotifyUi.Poll);
                         Track now = ReadMedia();
-                        if (now != null && now.Playing && now.Key != beforeKey) result = "Playing " + Brief(now) + ".";
+                        if (now != null && now.Playing && now.Key != beforeKey) result = Lang.F("Playing {0}.", Brief(now));
                         // Pressing play on a result sometimes only selects it: if nothing is playing after a few seconds, the play key is pressed once.
                         else if (!nudged && waited >= Math.Min(3.0, limit / 2)) { nudged = true; Press(0xB3, 1); }
                     }
-                    if (result == null) result = "I pressed play on " + query + " but nothing started.";
+                    if (result == null) result = Lang.F("I pressed play on {0} but nothing started.", query);
                 }
                 if (IsDisposed || !IsHandleCreated) return;
                 BeginInvoke((Action)delegate { spotifyBusy = false; Respond(result); });
@@ -2356,7 +2390,7 @@ namespace CapriDesktop
         // "Play it on YouTube": the first video for the search is opened itself. One request goes to youtube.com for this, nothing else.
         private void PlayOnYouTube(string query, string search, string said)
         {
-            Reflect(said, "Finding " + query + " on YouTube…");
+            Reflect(said, Lang.F("Finding {0} on YouTube…", query));
             ThreadPool.QueueUserWorkItem(delegate
             {
                 string id = YouTube.FirstVideo(YouTube.Fetch(query));
@@ -2364,7 +2398,7 @@ namespace CapriDesktop
                 BeginInvoke((Action)delegate
                 {
                     Open(id != null ? "https://www.youtube.com/watch?v=" + id : search);
-                    Respond(id != null ? "Playing " + query + "!" : "I couldn't pick one, so here are the results.");
+                    Respond(id != null ? Lang.F("Playing {0}!", query) : "I couldn't pick one, so here are the results.");
                 });
             });
         }
@@ -2383,18 +2417,18 @@ namespace CapriDesktop
                     return true;
                 case ErrandKind.Forget:
                     int dropped = Forget(errand.Text);
-                    Reflect(said, dropped == 1 ? "Forgotten! Convenient, huh?" : dropped == 0 ? "I don't have anything like that!" : "That's " + (-dropped) + " things! Be more specific.");
+                    Reflect(said, dropped == 1 ? "Forgotten! Convenient, huh?" : dropped == 0 ? "I don't have anything like that!" : Lang.F("That's {0} things! Be more specific.", -dropped));
                     return true;
                 case ErrandKind.ForgetAll:
                     ForgetEverything();
                     Reflect(said, "Everything about you? Gone! Hi, I'm Capri!");
                     return true;
                 case ErrandKind.Timer:
-                    if (AddAlarm(DateTime.Now.AddSeconds(errand.Seconds), errand.Text.Length > 0 ? errand.Text : "Timer: " + Errands.Describe(errand.Seconds), false)) Reflect(said, "Timer's on for " + Errands.Describe(errand.Seconds) + (errand.Text.Length > 0 ? ": " + errand.Text : "") + "!");
+                    if (AddAlarm(DateTime.Now.AddSeconds(errand.Seconds), errand.Text.Length > 0 ? errand.Text : "Timer: " + Errands.Describe(errand.Seconds), false)) Reflect(said, Lang.F("Timer's on for {0}!", Errands.Describe(errand.Seconds) + (errand.Text.Length > 0 ? ": " + errand.Text : "")));
                     else Reflect(said, "That's plenty of alarms already!");
                     return true;
                 case ErrandKind.Clock:
-                    if (AddAlarm(errand.Due, errand.Text, false)) Reflect(said, "Alarm's set for " + errand.Due.ToString("HH:mm") + "!");
+                    if (AddAlarm(errand.Due, errand.Text, false)) Reflect(said, Lang.F("Alarm's set for {0}!", errand.Due.ToString("HH:mm")));
                     else Reflect(said, "That's plenty of alarms already!");
                     return true;
                 case ErrandKind.ClearAlarms:
@@ -2405,7 +2439,7 @@ namespace CapriDesktop
                     return true;
                 case ErrandKind.Study:
                     StartStudy((int)(errand.Seconds / 60), 5);
-                    Reflect(said, "Focus time! " + (int)(errand.Seconds / 60) + " minutes. I'll keep quiet!");
+                    Reflect(said, Lang.F("Focus time! {0} minutes. I'll keep quiet!", (int)(errand.Seconds / 60)));
                     return true;
                 case ErrandKind.StopStudy:
                     if (study == StudyPhase.Off) { Reflect(said, "We're not studying!"); return true; }
@@ -2414,7 +2448,7 @@ namespace CapriDesktop
                     return true;
                 case ErrandKind.Web:
                     Open(errand.Target);
-                    Reflect(said, "Looking up " + errand.Text + "!");
+                    Reflect(said, Lang.F("Looking up {0}!", errand.Text));
                     return true;
                 case ErrandKind.PlaySong:
                     PlayOnSpotify(errand.Text, said);
@@ -2424,7 +2458,7 @@ namespace CapriDesktop
                     return true;
                 case ErrandKind.Open:
                     Open(errand.Target);
-                    Reflect(said, errand.More ? "Opened " + errand.Text + ". The rest I can't do yet." : Pick(Done));
+                    Reflect(said, errand.More ? Lang.F("Opened {0}. The rest I can't do yet.", errand.Text) : Pick(Done));
                     return true;
                 case ErrandKind.Pause:
                 case ErrandKind.Play:
@@ -2484,7 +2518,7 @@ namespace CapriDesktop
                     if (failed || answer.Length == 0)
                     {
                         chatLog.Remove(said);
-                        Respond(link.Cloud ? "Cloud trouble: " + Cloud.LastError + ". Chat, Cloud model settings to change it." : failed ? "I can't reach my brain! Is the model still running?" : "Hm, I lost my train of thought!");
+                        Respond(link.Cloud ? Lang.F("Cloud trouble: {0}. Chat, Cloud model settings to change it.", Cloud.LastError) : failed ? "I can't reach my brain! Is the model still running?" : "Hm, I lost my train of thought!");
                         return;
                     }
                     answer = Llm.Shape(answer, chance);
@@ -4957,6 +4991,80 @@ namespace CapriDesktop
                             SavePreferences();
                             if (LoadPreferences().Size != 240) throw new Exception("Settings did not round-trip.");
                             checks.Add("PASS settings round-trip in isolated test directory");
+                            string langDir = Path.GetDirectoryName(settingsPath);
+                            Lang.Load("pl", langDir);
+                            if (Lang.T("Hide Capri") != "Ukryj Capri" || Lang.F("Sync with Capri: {0}%", 40) != "Synchronizacja z Capri: 40%" || Lang.T("a line nobody translated") != "a line nobody translated" || !Lang.T("Each time she dares you (every half hour or so) she will take one screenshot of your screen, keep it in memory only, and send it to your local model. A cloud model only gets it if you allowed screenshots in Chat, Cloud model settings.\n\nTurn this on?").Contains("\n\n")) throw new Exception("A translated line did not load.");
+                            Lang.Load("es", langDir);
+                            if (!BrainText().Contains("Write every reply in Spanish") || !PersonaText().Contains("Write every reply in Spanish")) throw new Exception("The model was not told to answer in the chosen language.");
+                            Lang.Load("pt", langDir);
+                            if (!BrainText().Contains("Write every reply in Portuguese") || Lang.Count("{0} minute|{0} minutes", 1) != "1 minuto" || Lang.Count("{0} minute|{0} minutes", 5) != "5 minutos") throw new Exception("Portuguese did not load as expected.");
+                            Lang.Load("en", langDir);
+                            if (BrainText().Contains("Write every reply in")) throw new Exception("English was given a language instruction.");
+                            checks.Add("PASS the model is told which language to answer in, and not for English");
+                            Lang.Load("pl", langDir);
+                            foreach (string[] choice in Lang.Choices)
+                            {
+                                Lang.Load(choice[0], langDir);
+                                if (Lang.Code != choice[0] || (choice[0] != "en" && Lang.T("Quit Capri") == "Quit Capri") || !Lang.F("{0} minutes", 5).Contains("5")) throw new Exception("The " + choice[1] + " words did not load.");
+                            }
+                            foreach (string[] choice in Lang.Choices)
+                            {
+                                // Longer words must still fit the fixed-size windows, so each language gets a picture of two of them.
+                                Lang.Load(choice[0], langDir);
+                                using (CloudForm view = new CloudForm("anthropic", "claude-haiku-5-5", "", false, false, true))
+                                using (AskForm ask = new AskForm("Server address", "Where is your local model running?", "Leave empty to look for Ollama or LM Studio. Only this computer is allowed.", delegate(string text) { return null; }))
+                                {
+                                    view.Show();
+                                    ask.Show();
+                                    Application.DoEvents();
+                                    using (Bitmap shot = new Bitmap(view.Width, view.Height))
+                                    {
+                                        view.DrawToBitmap(shot, new Rectangle(Point.Empty, view.Size));
+                                        shot.Save(Path.Combine(output, "lang-cloud-" + choice[0] + ".png"), ImageFormat.Png);
+                                    }
+                                    using (Bitmap shot = new Bitmap(ask.Width, ask.Height))
+                                    {
+                                        ask.DrawToBitmap(shot, new Rectangle(Point.Empty, ask.Size));
+                                        shot.Save(Path.Combine(output, "lang-ask-" + choice[0] + ".png"), ImageFormat.Png);
+                                    }
+                                }
+                            }
+                            Lang.Load("../x", langDir);
+                            if (Lang.Code != "en" || Lang.T("Quit Capri") != "Quit Capri") throw new Exception("An unknown language did not fall back to English.");
+                            Lang.Load("en", langDir);
+                            if (Lang.In("fr", "Quit Capri") != "Quitter Capri" || Lang.Code != "en" || Lang.T("Quit Capri") != "Quit Capri") throw new Exception("Saying one line in another language changed the language in use.");
+                            Lang.Load("pl", langDir);
+                            if (Lang.Count("{0} minute|{0} minutes", 1) != "1 minuta" || Lang.Count("{0} minute|{0} minutes", 2) != "2 minuty" || Lang.Count("{0} minute|{0} minutes", 5) != "5 minut" || Lang.Count("{0} minute|{0} minutes", 12) != "12 minut" || Lang.Count("{0} minute|{0} minutes", 22) != "22 minuty") throw new Exception("Polish plurals were wrong.");
+                            Lang.Load("en", langDir);
+                            if (Lang.Count("{0} minute|{0} minutes", 1) != "1 minute" || Errands.Describe(300) != "5 minutes" || Errands.Describe(3900) != "1 hour 5 min" || Errands.Describe(1) != "1 second") throw new Exception("English lengths of time changed.");
+                            Lang.Load("de", langDir);
+                            if (Errands.Describe(300) != "5 Minuten" || Lang.T("Good boy!") != "Braver Junge!") throw new Exception("German lengths of time were wrong.");
+                            bool wasHidden = hidden;
+                            hidden = false;
+                            lastSaid = -100;
+                            Respond("Skipped!");
+                            string translatedLine = bubble != null && bubble.Visible ? bubble.Message : "";
+                            hidden = wasHidden;
+                            Lang.Load("en", langDir);
+                            if (translatedLine != "Übersprungen!") throw new Exception("A line she says was not translated: " + translatedLine);
+                            string settingsKept = File.Exists(settingsPath) ? File.ReadAllText(settingsPath) : null;
+                            File.WriteAllText(settingsPath, "{\"Language\":\"pl\"}");
+                            Preferences onlyLanguage = LoadPreferences();
+                            if (settingsKept != null) File.WriteAllText(settingsPath, settingsKept); else File.Delete(settingsPath);
+                            if (onlyLanguage.Language != "pl" || onlyLanguage.Size != 240 || !onlyLanguage.Motion || !onlyLanguage.Bubbles) throw new Exception("A settings file holding only a language did not load with the usual defaults.");
+                            Directory.CreateDirectory(Path.Combine(langDir, "lang"));
+                            File.WriteAllText(Path.Combine(langDir, "lang", "pl.txt"), "> Hide Capri\nSchowaj mnie\n", Encoding.UTF8);
+                            Lang.Load("pl", langDir);
+                            if (Lang.T("Hide Capri") != "Schowaj mnie" || Lang.T("Quit Capri") != "Zamknij Capri") throw new Exception("A language file of your own did not override the built-in words.");
+                            File.Delete(Path.Combine(langDir, "lang", "pl.txt"));
+                            Lang.Load("en", langDir);
+                            ChooseLanguage("de");
+                            ToolStripMenuItem languageGroup = null;
+                            foreach (ToolStripItem entry in menu.Items) if (entry.Name == "language") languageGroup = (ToolStripMenuItem)entry;
+                            if (languageGroup == null || LoadPreferences().Language != "de" || !((ToolStripMenuItem)languageGroup.DropDownItems[3]).Checked || ((ToolStripMenuItem)languageGroup.DropDownItems[0]).Checked) throw new Exception("Choosing a language was not saved or ticked.");
+                            ChooseLanguage("en");
+                            if (LoadPreferences().Language != "en") throw new Exception("Going back to English was not saved.");
+                            checks.Add("PASS languages load, fall back to English, can be overridden by your own file, and the choice is saved");
                             backdrop = new Form();
                             backdrop.Text = "Capri clean test desktop";
                             backdrop.FormBorderStyle = FormBorderStyle.None;
@@ -6084,10 +6192,10 @@ namespace CapriDesktop
 
         internal static string Describe(double seconds)
         {
-            if (seconds < 60) return (int)seconds + (seconds < 2 ? " second" : " seconds");
-            if (seconds < 3600) { int m = (int)Math.Round(seconds / 60); return m + (m == 1 ? " minute" : " minutes"); }
+            if (seconds < 60) return Lang.Count("{0} second|{0} seconds", (int)seconds);
+            if (seconds < 3600) return Lang.Count("{0} minute|{0} minutes", (int)Math.Round(seconds / 60));
             int h = (int)(seconds / 3600), rest = (int)Math.Round((seconds - h * 3600) / 60);
-            return h + (h == 1 ? " hour" : " hours") + (rest > 0 ? " " + rest + " min" : "");
+            return Lang.Count("{0} hour|{0} hours", h) + (rest > 0 ? " " + Lang.F("{0} min", rest) : "");
         }
 
         // The next time the clock shows this, today or tomorrow. With no am or pm the nearest of the two is used.
@@ -7085,10 +7193,10 @@ namespace CapriDesktop
             Neon.Shape(this, 14);
             transcript = new RichTextBox { Bounds = new Rectangle(18, 192, 384, 280), ReadOnly = true, BorderStyle = BorderStyle.None, BackColor = Neon.Panel, ForeColor = Neon.Text, DetectUrls = false, HideSelection = false, ScrollBars = RichTextBoxScrollBars.Vertical, Font = Neon.Font(10.5f), TabStop = false };
             input = new TextBox { Bounds = new Rectangle(18, 484, 236, 58), Multiline = true, BackColor = Neon.Panel, ForeColor = Neon.Green, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 10.5f), MaxLength = 500 };
-            send = new Button { Text = "SEND", Bounds = new Rectangle(322, 484, 80, 58), FlatStyle = FlatStyle.Flat, BackColor = Neon.Crimson, ForeColor = Color.White, Cursor = Cursors.Hand };
+            send = new Button { Text = Lang.T("SEND"), Bounds = new Rectangle(322, 484, 80, 58), FlatStyle = FlatStyle.Flat, BackColor = Neon.Crimson, ForeColor = Color.White, Cursor = Cursors.Hand };
             send.FlatAppearance.BorderSize = 0;
             send.Click += delegate { Entered(); };
-            mic = new Button { Text = "MIC", Bounds = new Rectangle(260, 484, 54, 58), FlatStyle = FlatStyle.Flat, BackColor = Neon.Void, ForeColor = Neon.Green, Cursor = Cursors.Hand };
+            mic = new Button { Text = Lang.T("MIC"), Bounds = new Rectangle(260, 484, 54, 58), FlatStyle = FlatStyle.Flat, BackColor = Neon.Void, ForeColor = Neon.Green, Cursor = Cursors.Hand };
             mic.FlatAppearance.BorderColor = Neon.Green;
             mic.Click += delegate { Action handler = Spoke; if (handler != null) handler(); };
             input.KeyDown += delegate(object sender, KeyEventArgs key) { if (key.KeyCode == Keys.Enter && !key.Shift) { key.SuppressKeyPress = true; Entered(); } };
@@ -7300,24 +7408,24 @@ namespace CapriDesktop
 
         internal CloudForm(string chosen, string modelName, string address, bool looks, bool remembers, bool hasKey)
         {
-            Text = "Cloud model";
+            Text = Lang.T("Cloud model");
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             TopMost = true;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(480, 470);
+            ClientSize = new Size(480, 500);
             AutoScaleMode = AutoScaleMode.None;
             BackColor = Neon.Void;
             ForeColor = Neon.Text;
             Font = Neon.Font(10);
             Neon.Shape(this, 14);
-            Controls.Add(new Label { Text = "Provider", Bounds = new Rectangle(24, 52, 200, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
+            Controls.Add(new Label { Text = Lang.T("Provider"), Bounds = new Rectangle(24, 52, 200, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
             provider.Bounds = new Rectangle(24, 74, 432, 28);
             provider.DropDownStyle = ComboBoxStyle.DropDownList;
             provider.FlatStyle = FlatStyle.Flat;
             provider.BackColor = Neon.Panel;
             provider.ForeColor = Neon.Green;
-            provider.Items.AddRange(Names);
+            foreach (string name in Names) provider.Items.Add(Lang.T(name));
             provider.SelectedIndex = Math.Max(0, Array.IndexOf(Ids, chosen));
             provider.DrawMode = DrawMode.OwnerDrawFixed;
             provider.ItemHeight = 22;
@@ -7326,11 +7434,11 @@ namespace CapriDesktop
                 if (e.Index < 0) return;
                 bool hot = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0;
                 using (Brush back = new SolidBrush(hot ? Neon.Crimson : Neon.Panel)) e.Graphics.FillRectangle(back, e.Bounds);
-                using (Brush text = new SolidBrush(hot ? Color.White : Neon.Green)) e.Graphics.DrawString(Names[e.Index], e.Font, text, e.Bounds.X + 4, e.Bounds.Y + 2);
+                using (Brush text = new SolidBrush(hot ? Color.White : Neon.Green)) e.Graphics.DrawString(Lang.T(Names[e.Index]), e.Font, text, e.Bounds.X + 4, e.Bounds.Y + 2);
             };
             provider.SelectedIndexChanged += delegate { Refresh2(); };
             Controls.Add(provider);
-            Controls.Add(new Label { Text = "Model", Bounds = new Rectangle(24, 110, 200, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
+            Controls.Add(new Label { Text = Lang.T("Model"), Bounds = new Rectangle(24, 110, 200, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
             Style(model, 132);
             model.Text = modelName;
             Controls.Add(model);
@@ -7339,43 +7447,43 @@ namespace CapriDesktop
             hint.BackColor = Color.Transparent;
             hint.Font = Neon.Font(8.5f);
             Controls.Add(hint);
-            Controls.Add(new Label { Text = "Address (custom only)", Bounds = new Rectangle(24, 184, 300, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
+            Controls.Add(new Label { Text = Lang.T("Address (custom only)"), Bounds = new Rectangle(24, 184, 300, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
             Style(url, 206);
             url.Text = address;
             Controls.Add(url);
-            Controls.Add(new Label { Text = hasKey ? "Key (saved, leave empty to keep it)" : "Key", Bounds = new Rectangle(24, 246, 400, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
+            Controls.Add(new Label { Text = hasKey ? Lang.T("Key (saved, leave empty to keep it)") : Lang.T("Key"), Bounds = new Rectangle(24, 246, 270, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent });
             Style(key, 268);
             key.UseSystemPasswordChar = true;
             Controls.Add(key);
-            look.Text = "Also send my screen when I ask her to look";
+            look.Text = Lang.T("Also send my screen when I ask her to look");
             look.Checked = looks;
-            memory.Text = "Also send what she remembers about me";
+            memory.Text = Lang.T("Also send what she remembers about me");
             memory.Checked = remembers;
             look.Bounds = new Rectangle(24, 310, 432, 24);
             memory.Bounds = new Rectangle(24, 336, 432, 24);
             foreach (CheckBox box in new CheckBox[] { look, memory }) { box.ForeColor = Neon.Text; box.BackColor = Color.Transparent; Controls.Add(box); }
-            Controls.Add(new Label { Text = "Your chat messages go to this company, along with her persona. The key is kept encrypted for your Windows account only. Nothing else leaves your computer unless a box above is ticked.", Bounds = new Rectangle(24, 366, 432, 54), ForeColor = Neon.Crimson, BackColor = Color.Transparent, Font = Neon.Font(8.5f) });
-            problem.Bounds = new Rectangle(24, 420, 260, 36);
+            Controls.Add(new Label { Text = Lang.T("Your chat messages go to this company, along with her persona. The key is kept encrypted for your Windows account only. Nothing else leaves your computer unless a box above is ticked."), Bounds = new Rectangle(24, 366, 432, 82), ForeColor = Neon.Crimson, BackColor = Color.Transparent, Font = Neon.Font(8.5f) });
+            problem.Bounds = new Rectangle(24, 452, 260, 36);
             problem.ForeColor = Neon.Crimson;
             problem.BackColor = Color.Transparent;
             problem.Font = Neon.Font(8.5f);
             Controls.Add(problem);
-            Button ok = new Button { Text = "SAVE", Bounds = new Rectangle(290, 424, 80, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Crimson, ForeColor = Color.White, Cursor = Cursors.Hand };
+            Button ok = new Button { Text = Lang.T("SAVE"), Bounds = new Rectangle(240, 454, 106, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Crimson, ForeColor = Color.White, Cursor = Cursors.Hand };
             ok.FlatAppearance.BorderSize = 0;
             ok.Click += delegate
             {
-                if (Model.Length == 0) { problem.Text = "Enter a model name."; return; }
-                if (Provider == "custom" && !Cloud.UrlOk(Url)) { problem.Text = "A custom address must start with https://"; return; }
-                if (Key.Length == 0 && !hasKey) { problem.Text = "Paste your key."; return; }
+                if (Model.Length == 0) { problem.Text = Lang.T("Enter a model name."); return; }
+                if (Provider == "custom" && !Cloud.UrlOk(Url)) { problem.Text = Lang.T("A custom address must start with https://"); return; }
+                if (Key.Length == 0 && !hasKey) { problem.Text = Lang.T("Paste your key."); return; }
                 DialogResult = DialogResult.OK;
             };
-            Button cancel = new Button { Text = "CANCEL", Bounds = new Rectangle(376, 424, 80, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Void, ForeColor = Neon.Text, DialogResult = DialogResult.Cancel, Cursor = Cursors.Hand };
+            Button cancel = new Button { Text = Lang.T("CANCEL"), Bounds = new Rectangle(352, 454, 104, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Void, ForeColor = Neon.Text, DialogResult = DialogResult.Cancel, Cursor = Cursors.Hand };
             cancel.FlatAppearance.BorderColor = Neon.Line;
             Controls.Add(ok);
             Controls.Add(cancel);
             if (hasKey)
             {
-                LinkLabel removeLink = new LinkLabel { Text = "Remove saved key", Bounds = new Rectangle(296, 246, 160, 20), LinkColor = Neon.Crimson, BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleRight };
+                LinkLabel removeLink = new LinkLabel { Text = Lang.T("Remove saved key"), Bounds = new Rectangle(296, 246, 160, 20), LinkColor = Neon.Crimson, BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleRight };
                 removeLink.Click += delegate { remove = true; DialogResult = DialogResult.OK; };
                 Controls.Add(removeLink);
             }
@@ -7395,7 +7503,7 @@ namespace CapriDesktop
 
         private void Refresh2()
         {
-            hint.Text = Hints[Math.Max(0, provider.SelectedIndex)];
+            hint.Text = Lang.T(Hints[Math.Max(0, provider.SelectedIndex)]);
             url.Enabled = Provider == "custom";
         }
 
@@ -7406,7 +7514,7 @@ namespace CapriDesktop
             using (Pen scan = new Pen(Color.FromArgb(10, 255, 255, 255))) for (int y = 40; y < Height; y += 3) e.Graphics.DrawLine(scan, 16, y, Width - 16, y);
             using (Font mono = new Font("Consolas", 10, FontStyle.Bold))
             using (Brush red = new SolidBrush(Neon.Crimson))
-            using (Brush green = new SolidBrush(Neon.Green)) { e.Graphics.DrawString("//", mono, red, 22, 14); e.Graphics.DrawString("CLOUD MODEL", mono, green, 46, 14); }
+            using (Brush green = new SolidBrush(Neon.Green)) { e.Graphics.DrawString("//", mono, red, 22, 14); e.Graphics.DrawString(Lang.T("Cloud model").ToUpper(), mono, green, 46, 14); }
             using (Pen line = new Pen(Neon.Line)) e.Graphics.DrawLine(line, 22, 40, Width - 22, 40);
         }
 
@@ -7431,25 +7539,26 @@ namespace CapriDesktop
         internal AskForm(string title, string prompt, string example, Func<string, string> validate)
         {
             check = validate;
+            title = Lang.T(title);
             Text = title;
             heading = title;
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             TopMost = true;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(440, 214);
+            ClientSize = new Size(440, 224);
             AutoScaleMode = AutoScaleMode.None;
             BackColor = Neon.Void;
             ForeColor = Neon.Text;
             Font = Neon.Font(10);
             Neon.Shape(this, 14);
-            Controls.Add(new Label { Text = prompt, Bounds = new Rectangle(24, 52, 392, 24), ForeColor = ForeColor, BackColor = Color.Transparent });
+            Controls.Add(new Label { Text = Lang.T(prompt), Bounds = new Rectangle(24, 52, 392, 24), ForeColor = ForeColor, BackColor = Color.Transparent });
             input = new TextBox { Bounds = new Rectangle(24, 82, 392, 28), BackColor = Neon.Panel, ForeColor = Neon.Green, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 11) };
             Controls.Add(input);
-            Controls.Add(new Label { Text = example, Bounds = new Rectangle(24, 116, 392, 20), ForeColor = Neon.Dim, BackColor = Color.Transparent, Font = Neon.Font(8.5f) });
-            problem = new Label { Bounds = new Rectangle(24, 138, 392, 22), ForeColor = Neon.Crimson, BackColor = Color.Transparent, Font = Neon.Font(8.5f) };
+            Controls.Add(new Label { Text = Lang.T(example), Bounds = new Rectangle(24, 116, 392, 32), ForeColor = Neon.Dim, BackColor = Color.Transparent, Font = Neon.Font(8.5f) });
+            problem = new Label { Bounds = new Rectangle(24, 150, 392, 22), ForeColor = Neon.Crimson, BackColor = Color.Transparent, Font = Neon.Font(8.5f) };
             Controls.Add(problem);
-            Button ok = new Button { Text = "OK", Bounds = new Rectangle(226, 168, 90, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Crimson, ForeColor = Color.White, Cursor = Cursors.Hand };
+            Button ok = new Button { Text = Lang.T("OK"), Bounds = new Rectangle(226, 178, 90, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Crimson, ForeColor = Color.White, Cursor = Cursors.Hand };
             ok.FlatAppearance.BorderSize = 0;
             ok.Click += delegate
             {
@@ -7459,7 +7568,7 @@ namespace CapriDesktop
                 Answer = input.Text;
                 DialogResult = DialogResult.OK;
             };
-            Button cancel = new Button { Text = "Cancel", Bounds = new Rectangle(326, 168, 90, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Void, ForeColor = Neon.Text, DialogResult = DialogResult.Cancel, Cursor = Cursors.Hand };
+            Button cancel = new Button { Text = Lang.T("Cancel"), Bounds = new Rectangle(326, 178, 90, 32), FlatStyle = FlatStyle.Flat, BackColor = Neon.Void, ForeColor = Neon.Text, DialogResult = DialogResult.Cancel, Cursor = Cursors.Hand };
             cancel.FlatAppearance.BorderColor = Neon.Line;
             Controls.Add(ok);
             Controls.Add(cancel);

@@ -15,6 +15,10 @@ rem Every sprite in assets\art is embedded as Capri.Art.<name>.png (see tools\ma
 set "ART="
 for %%f in (assets\art\*.png) do set "ART=!ART! /resource:%%f,Capri.Art.%%~nf.png"
 
+rem Every language file in assets\lang is embedded as Capri.Lang.<code>.txt.
+set "LANGS="
+for %%f in (assets\lang\*.txt) do set "LANGS=!LANGS! /resource:%%f,Capri.Lang.%%~nf.txt"
+
 echo Building Capri.exe...
 "%CSC%" /nologo /target:winexe /optimize+ /out:build\Capri.exe ^
     /win32icon:assets\chip.ico /win32manifest:app\app.manifest ^
@@ -25,8 +29,8 @@ echo Building Capri.exe...
     /resource:assets\chip.ico,Capri.Chip.ico ^
     /resource:assets\chip.png,Capri.Chip.png ^
     /resource:assets\persona.txt,Capri.Persona.txt ^
-    !ART! ^
-    app\Capri.cs app\AssemblyInfo.cs
+    !ART! !LANGS! ^
+    app\Capri.cs app\Lang.cs app\AssemblyInfo.cs
 if errorlevel 1 (
     echo.
     echo Capri.exe failed to build. If Capri is running from the build folder, quit her from the tray and try again.
@@ -40,9 +44,10 @@ echo Building Capri-Setup.exe...
     /reference:System.Windows.Forms.dll /reference:System.Drawing.dll ^
     /reference:System.Core.dll /reference:Microsoft.CSharp.dll ^
     /resource:build\Capri.exe,Capri.App.exe ^
+    !LANGS! ^
     /resource:assets\chip.ico,Capri.Chip.ico ^
     /resource:assets\chip.png,Capri.Chip.png ^
-    app\Setup.cs app\AssemblyInfo.cs
+    app\Setup.cs app\Lang.cs app\AssemblyInfo.cs
 if errorlevel 1 (
     echo.
     echo Capri-Setup.exe failed to build.

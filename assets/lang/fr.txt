@@ -1,0 +1,710 @@
+# Capri translation: Français (machine-made, corrections welcome).
+# A line starting with "> " is the English wording; the line under it is the translation.
+# Keep {0} as it is. \n is a new line. Delete a pair to fall back to English.
+
+> Hide Capri
+Cacher Capri
+> Size
+Taille
+> Idle motion
+Mouvements au repos
+> Always on top
+Toujours au premier plan
+> Perch on cursor
+Se percher sur le curseur
+> Reactions
+Réactions
+> Play now
+Jouer maintenant
+> Automatic
+Automatique
+> Say something
+Dire quelque chose
+> Hacked note
+Note piratée
+> Glitch only
+Glitch seul
+> Glitch style
+Style de glitch
+> She notices things
+Elle remarque des choses
+> She dares me
+Elle me lance des défis
+> She looks when she dares (uses a screenshot)
+Elle regarde quand elle lance un défi (utilise une capture d'écran)
+> Each time she dares you (every half hour or so) she will take one screenshot of your screen, keep it in memory only, and send it to your local model. A cloud model only gets it if you allowed screenshots in Chat, Cloud model settings.\n\nTurn this on?
+À chaque défi (environ toutes les demi-heures), elle fera une capture de ton écran, la gardera en mémoire uniquement et l'enverra à ton modèle local. Un modèle cloud ne la reçoit que si tu as autorisé les captures dans Chat, Paramètres du modèle cloud.\n\nActiver cette option ?
+> Dare me now
+Lance-moi un défi maintenant
+> Sync with Capri: {0}%
+Synchro avec Capri : {0} %
+> Speech bubbles
+Bulles de dialogue
+> Hide in fullscreen
+Cacher en plein écran
+> Start with Windows
+Lancer avec Windows
+> Windows wouldn't let me.
+Windows ne m'a pas laissée faire.
+> Face in bubbles
+Visage dans les bulles
+> Cut-in cards
+Cartes d'incrustation
+> Music
+Musique
+> Off
+Désactivé
+> Looking for what is playing...
+Je cherche ce qui joue...
+> Show what's playing
+Afficher ce qui joue
+> React to it
+Y réagir
+> Uses your local model when it is connected; otherwise a plain cheer.
+Utilise ton modèle local s'il est connecté ; sinon, un simple encouragement.
+> Show it now
+Afficher maintenant
+> Bring to this screen
+Amener sur cet écran
+> Quit Capri
+Quitter Capri
+> Capri · Double-click to restore
+Capri · Double-clic pour restaurer
+> Turn on Idle motion to let her do this on her own.
+Active les mouvements au repos pour qu'elle le fasse toute seule.
+> Hop off
+Descendre
+> Ctrl + Alt + C is taken by another app. Right-click Capri's tray icon and choose Hop off.
+Ctrl + Alt + C est utilisé par une autre application. Fais un clic droit sur l'icône de Capri dans la zone de notification et choisis Descendre.
+> Voice
+Voix
+> Mute
+Muet
+> Play a sample
+Jouer un échantillon
+> Open voice folder…
+Ouvrir le dossier de voix…
+> No alarms set
+Aucune alarme définie
+> Cancel
+Annuler
+> Resume
+Reprendre
+> Pause
+Pause
+> Timers
+Minuteurs
+> Study timer
+Minuteur d'étude
+> Start 25 min focus, 5 min break
+Démarrer 25 min de concentration, 5 min de pause
+> Start 50 min focus, 10 min break
+Démarrer 50 min de concentration, 10 min de pause
+> Stop
+Arrêter
+> Alarms
+Alarmes
+> Set a timer…
+Régler un minuteur…
+> Set alarm…
+Régler une alarme…
+> Remind me in
+Me rappeler dans
+> {0} minutes
+{0} minutes
+> Chime
+Carillon
+> Try 10 minutes, 30 seconds or an hour.
+Écris en anglais, par exemple 10 minutes, 30 seconds ou an hour.
+> Try 7:30, 6:15 pm or in 20m, then an optional note.
+Écris en anglais, par exemple 7:30, 6:15 pm ou in 20m, puis une note facultative.
+> Chat
+Chat
+> Speak to her
+Lui parler
+> Windows has no speech recognizer installed.
+Windows n'a pas de reconnaissance vocale installée.
+> Mic button on hover
+Bouton micro au survol
+> Talk to Capri…
+Parler à Capri…
+> Microphone
+Microphone
+> Windows default
+Par défaut de Windows
+> Use Whisper when it is installed
+Utiliser Whisper s'il est installé
+> Memory
+Mémoire
+> Let her remember things
+La laisser retenir des choses
+> Show what she remembers
+Afficher ce dont elle se souvient
+> Forget everything
+Tout oublier
+> Make her forget everything she has noted about you?
+La faire oublier tout ce qu'elle a noté sur toi ?
+> Cloud model settings…
+Paramètres du modèle cloud…
+> Use the cloud model
+Utiliser le modèle cloud
+> Look at my screen
+Regarder mon écran
+> Let her look when I ask
+La laisser regarder quand je le demande
+> Wait through pauses
+Attendre pendant les pauses
+> Short (1.2 seconds)
+Court (1,2 seconde)
+> Normal (2.5 seconds)
+Normal (2,5 secondes)
+> Long (4 seconds)
+Long (4 secondes)
+> Use a local model
+Utiliser un modèle local
+> Looking for a model…
+Je cherche un modèle…
+> Model
+Modèle
+> Server address…
+Adresse du serveur…
+> Edit her personality…
+Modifier sa personnalité…
+> Forget this conversation
+Oublier cette conversation
+> SEND
+ENVOYER
+> MIC
+MICRO
+> Cloud model
+Modèle cloud
+> Provider
+Fournisseur
+> Address (custom only)
+Adresse (personnalisé uniquement)
+> Also send my screen when I ask her to look
+Envoyer aussi mon écran quand elle regarde
+> Also send what she remembers about me
+Envoyer aussi ce qu'elle retient sur moi
+> Your chat messages go to this company, along with her persona. The key is kept encrypted for your Windows account only. Nothing else leaves your computer unless a box above is ticked.
+Tes messages de chat sont envoyés à cette entreprise, avec sa personnalité. La clé est conservée chiffrée, pour ton compte Windows uniquement. Rien d'autre ne quitte ton ordinateur, sauf si une case ci-dessus est cochée.
+> SAVE
+ENREGISTRER
+> Enter a model name.
+Saisis un nom de modèle.
+> A custom address must start with https://
+Une adresse personnalisée doit commencer par https://
+> Paste your key.
+Colle ta clé.
+> CANCEL
+ANNULER
+> Remove saved key
+Supprimer la clé
+> Key
+Clé
+> Key (saved, leave empty to keep it)
+Clé (enregistrée, vide = garder)
+> Custom (OpenAI-style, https)
+Personnalisé (style OpenAI, https)
+> A model id from openrouter.ai/models
+Un identifiant de modèle depuis openrouter.ai/models
+> A model name from your OpenAI account
+Un nom de modèle de ton compte OpenAI
+> For example claude-haiku-5-5
+Par exemple claude-haiku-5-5
+> The model name your server expects
+Le nom de modèle attendu par ton serveur
+> OK
+OK
+> Small
+Petit
+> Medium
+Moyen
+> Large
+Grand
+> Stretch
+S'étirer
+> Look around
+Regarder autour
+> Yawn
+Bâiller
+> Fall asleep
+S'endormir
+> Head pat
+Caresse sur la tête
+> Peek
+Jeter un œil
+> Sit on a window
+S'asseoir sur une fenêtre
+> Mischief
+Bêtises
+> Set a timer
+Régler un minuteur
+> How long?
+Combien de temps ?
+> Set an alarm
+Régler une alarme
+> When should she nudge you?
+Quand doit-elle te prévenir ?
+> Server address
+Adresse du serveur
+> Where is your local model running?
+Où tourne ton modèle local ?
+> Leave empty to look for Ollama or LM Studio. Only this computer is allowed.
+Laisse vide pour chercher Ollama ou LM Studio. Seul cet ordinateur est autorisé.
+> That isn't on this computer. Try localhost:11434.
+Ce n'est pas sur cet ordinateur. Essaie localhost:11434.
+> Bars
+Barres
+> Tear
+Déchirure
+> Corruption
+Corruption
+> Hex rain
+Pluie hexa
+> Sync bar
+Barre de synchro
+> Chaser
+Poursuiveur
+> Language
+Langue
+> Capri will use this language the next time she starts. Quit her from the tray and open her again.
+Capri utilisera cette langue au prochain démarrage. Quitte-la depuis la zone de notification et rouvre-la.
+> Capri · Ctrl + Alt + C to hop off
+Capri · Ctrl + Alt + C pour descendre
+> Capri · Hop off from this menu
+Capri · Descendre depuis ce menu
+> No study session
+Aucune session d'étude
+> Focus
+Concentration
+> Break
+Pause
+> {0} done
+{0} faites
+> Paused {0}
+{0} en pause
+> focus. {0} minutes. i'll keep quiet.
+concentration. {0} minutes. je me tais.
+> time. take {0} minutes.
+c'est l'heure. prends {0} minutes.
+> break's over. {0} more minutes.
+la pause est finie. encore {0} minutes.
+> time's up! {0}.
+c'est fini ! {0}.
+> you missed {0}.
+tu as raté {0}.
+> it's {0}.
+il est {0}.
+> alarm set for {0}.
+alarme réglée pour {0}.
+> timer's on for {0}.
+minuteur lancé pour {0}.
+> Nothing playing
+Rien ne joue
+> Playing: {0}
+En lecture : {0}
+> Paused: {0}
+En pause : {0}
+> NOW PLAYING
+EN LECTURE
+> {0} second|{0} seconds
+{0} seconde|{0} secondes
+> {0} minute|{0} minutes
+{0} minute|{0} minutes
+> {0} hour|{0} hours
+{0} heure|{0} heures
+> {0} min
+{0} min
+> an hour
+une heure
+> {0} hours
+{0} heures
+> SYNC {0}%.
+SYNCHRO {0} %.
+> UNLOCKED: {0}.
+DÉBLOQUÉ : {0}.
+> SYNC 100%. COMPLETE. You're mine now. Kidding! ...Mostly.
+SYNCHRO 100 %. TERMINÉ. Tu es à moi maintenant. Je plaisante ! ...Presque.
+> TEAR
+DÉCHIRURE
+> CORRUPTION
+CORRUPTION
+> HEX RAIN
+PLUIE HEXA
+> SYNC BAR
+BARRE DE SYNCHRO
+> CHASER
+POURSUIVEUR
+> COMPLETE
+TERMINÉ
+> Cloud brain works!
+Le cerveau cloud fonctionne !
+> Cloud trouble: {0}. Chat, Cloud model settings to change it.
+Souci avec le cloud : {0}. Change-le dans Chat, Paramètres du modèle cloud.
+> no answer
+pas de réponse
+> found {0}.
+j'ai trouvé {0}.
+> i can't find a local model. is ollama or lm studio running?
+je ne trouve pas de modèle local. ollama ou lm studio tourne ?
+> My brain's switched off! Chat, then Use a local model.
+Mon cerveau est éteint ! Chat, puis Utiliser un modèle local.
+> I'm not connected yet. Looking again!
+Je ne suis pas encore connectée. Je cherche à nouveau !
+> I can't reach my brain! Is the model still running?
+Je n'arrive pas à joindre mon cerveau ! Le modèle tourne encore ?
+> Hm, I lost my train of thought!
+Hm, j'ai perdu le fil !
+> I have no ears! Add an English speech pack in Windows settings.
+Je n'ai pas d'oreilles ! Ajoute un pack vocal anglais dans les paramètres Windows.
+> I can't use that microphone! Try another one in Chat, Microphone.
+Je ne peux pas utiliser ce micro ! Essaie-en un autre dans Chat, Microphone.
+> Can't hear you!
+Je ne t'entends pas !
+> Still can't hear you!
+Toujours pas de son !
+> Hello?? Still can't hear you!
+Allô ?? Je ne t'entends toujours pas !
+> Nope, still nothing! Try another mic in Chat, Microphone!
+Non, toujours rien ! Essaie un autre micro dans Chat, Microphone !
+> Sorry, say that again?
+Pardon, tu peux répéter ?
+> You've told me not to look! Chat, Let her look when I ask.
+Tu m'as dit de ne pas regarder ! Chat, La laisser regarder quand je le demande.
+> I need my brain connected to look. Chat, Use a local model.
+Il me faut mon cerveau connecté pour regarder. Chat, Utiliser un modèle local.
+> Looking stays on your computer. Run a local model, or allow it for the cloud in Chat, Cloud model.
+Regarder reste sur ton ordinateur. Lance un modèle local, ou autorise-le pour le cloud dans Chat, Modèle cloud.
+> I can only look through Ollama, sorry!
+Je ne peux regarder qu'à travers Ollama, désolée !
+> I can't see the screen right now!
+Je ne vois pas l'écran en ce moment !
+> My eyes went blurry. Ask again?
+Ma vue s'est brouillée. Redemande ?
+> Hm, that won't open!
+Hm, ça ne s'ouvre pas !
+> Still on the last one!
+Encore sur le dernier !
+> That's already playing!
+Ça joue déjà !
+> Finding {0} on Spotify…
+Je cherche {0} sur Spotify…
+> Finding {0} on YouTube…
+Je cherche {0} sur YouTube…
+> I can't find Spotify on this PC.
+Je ne trouve pas Spotify sur ce PC.
+> Spotify isn't open or won't let me in.
+Spotify n'est pas ouvert ou ne me laisse pas entrer.
+> I couldn't find {0} in Spotify's results.
+Je n'ai pas trouvé {0} dans les résultats de Spotify.
+> Playing {0}.
+Je lance {0}.
+> Playing {0}!
+Je lance {0} !
+> I pressed play on {0} but nothing started.
+J'ai appuyé sur lecture pour {0}, mais rien n'a démarré.
+> I couldn't pick one, so here are the results.
+Je n'ai pas pu en choisir un, voici les résultats.
+> My memory's switched off! Chat, Memory.
+Ma mémoire est désactivée ! Chat, Mémoire.
+> Not that one! Passwords belong in a password manager.
+Pas celui-là ! Les mots de passe vont dans un gestionnaire de mots de passe.
+> Hm, say that again?
+Hm, répète ?
+> Forgotten! Convenient, huh?
+Oublié ! Pratique, non ?
+> I don't have anything like that!
+Je n'ai rien de tel !
+> That's {0} things! Be more specific.
+Ça fait {0} choses ! Sois plus précis.
+> Everything about you? Gone! Hi, I'm Capri!
+Tout sur toi ? Effacé ! Salut, je suis Capri !
+> Timer's on for {0}!
+Minuteur lancé pour {0} !
+> That's plenty of alarms already!
+Ça fait déjà beaucoup d'alarmes !
+> Alarm's set for {0}!
+Alarme réglée pour {0} !
+> All cleared!
+Tout est effacé !
+> Focus time! {0} minutes. I'll keep quiet!
+C'est l'heure de se concentrer ! {0} minutes. Je me tais !
+> We're not studying!
+On n'étudie pas !
+> Ok, stopped!
+Ok, arrêté !
+> Looking up {0}!
+Je cherche {0} !
+> Opened {0}. The rest I can't do yet.
+{0} ouvert. Le reste, je ne sais pas encore.
+> Nothing's playing!
+Rien ne joue !
+> It's already playing!
+Ça joue déjà !
+> Skipped!
+Passé !
+> Back we go!
+On revient en arrière !
+> Louder!
+Plus fort !
+> Quieter!
+Moins fort !
+> I don't see anything playing!
+Je ne vois rien qui joue !
+> mischief on. ctrl+alt+c stops me.
+bêtises activées. ctrl+alt+c m'arrête.
+> i have no voice yet. open the voice folder to give me one.
+je n'ai pas encore de voix. ouvre le dossier de voix pour m'en donner une.
+> i'm muted.
+je suis en sourdine.
+> ok. stopped.
+ok. arrêté.
+> that's plenty of alarms.
+ça fait beaucoup d'alarmes.
+> nowhere to sit. try a window lower on the screen.
+nulle part où s'asseoir. essaie une fenêtre plus bas sur l'écran.
+> Ooh, nice view from up here!
+Ooh, belle vue d'ici !
+> Comfy! Don't mind me!
+Confortable ! Ne fais pas attention à moi !
+> Is this seat taken? Too late!
+Cette place est prise ? Trop tard !
+> Best seat in the house!
+La meilleure place de la maison !
+> Mmh, right there! Don't stop!
+Mmh, juste là ! Ne t'arrête pas !
+> Hehe! Careful, I might get used to this!
+Hehe ! Attention, je pourrais m'y habituer !
+> Oh? Oh! Okay, that's allowed!
+Oh ? Oh ! D'accord, c'est permis !
+> Pats are a very good bribe, you know!
+Les caresses, c'est un très bon pot-de-vin, tu sais !
+> Boop! Rude! Do it again!
+Boop ! Impoli ! Refais-le !
+> Yes? I'm busy being adorable!
+Oui ? Je suis occupée à être adorable !
+> You rang?
+Tu as sonné ?
+> Hey! I saw that!
+Hé ! J'ai vu ça !
+> I wasn't asleep! I was... recharging. Dramatically!
+Je ne dormais pas ! Je... rechargeais. Dramatiquement !
+> Mmh? Oh, you're back! Perfect timing!
+Mmh ? Oh, te revoilà ! Pile au bon moment !
+> Ooh, did I miss anything fun?
+Ooh, j'ai raté un truc marrant ?
+> Hi hi! Miss me?
+Coucou ! Je t'ai manqué ?
+> Come on, let's be friends!
+Allez, soyons amis !
+> So what are we getting into today?
+Alors, on fait quoi aujourd'hui ?
+> Psst! Something reckless? I'm in!
+Psst ! Un truc imprudent ? Je suis partante !
+> I'm only borrowing a little CPU! A LITTLE!
+J'emprunte juste un peu de CPU ! UN PEU !
+> Ooh, what's this one?
+Ooh, c'est quoi celui-là ?
+> New track! Turn it up!
+Nouveau morceau ! Monte le son !
+> Sure, play that. I'm listening!
+Ouais, mets ça. J'écoute !
+> Ooh, a vibe!
+Ooh, quelle ambiance !
+> Ha! Bold choice!
+Ha ! Choix audacieux !
+> Oh. You're back.
+Oh. Te revoilà.
+> Back already? I barely noticed.
+Déjà de retour ? Je n'ai presque rien remarqué.
+> Gone {0} minutes. Not that I counted.
+Parti {0} minutes. Pas que j'aie compté.
+> Where'd you go? Tell me everything.
+T'étais où ? Raconte-moi tout.
+> It's {0}. Nobody's stoppin' ya.
+Il est {0}. Personne ne t'arrête.
+> Still up at {0}? Good. More time with me.
+Encore debout à {0} ? Bien. Plus de temps avec moi.
+> {0}. Great time for bad ideas.
+{0}. Le moment idéal pour les mauvaises idées.
+> Battery's at {0}%. If you die, I'm stuck in a dead chip!
+Batterie à {0} %. Si tu meurs, je reste coincée dans une puce morte !
+> {0}% battery. Plug in! I'd be in a real jam.
+{0} % de batterie. Branche-toi ! Je serais dans de beaux draps.
+> Your CPU's at {0}%. That's not me! ...Mostly.
+Ton CPU est à {0} %. C'est pas moi ! ...Surtout.
+> Somethin's eatin' {0}% of your CPU. Not me. Probably.
+Un truc bouffe {0} % de ton CPU. Pas moi. Sûrement.
+> {1} for {0}? Wow.
+{1} pendant {0} ? Wow.
+> Still in {1}? It's been {0}.
+Toujours dans {1} ? Ça fait {0}.
+> {0} in {1}. I'm impressed. And bored.
+{0} dans {1}. Je suis impressionnée. Et je m'ennuie.
+> Yay! You did it!
+Youpi ! Tu l'as fait !
+> Told ya you could.
+Je t'avais dit que tu pouvais.
+> Look at you, doin' stuff!
+Regarde-moi ça, tu fais des trucs !
+> See? Fun.
+Tu vois ? C'est marrant.
+> Good boy!
+Bon garçon !
+> Noted! I never forget!
+Noté ! Je n'oublie jamais !
+> Got it. Filed away!
+Compris. Classé !
+> Mm-hm. I'll keep that!
+Mm-hm. Je garde ça !
+> Written on my soul. Kidding!
+Gravé dans mon âme. Je plaisante !
+> Done!
+Fait !
+> Easy!
+Facile !
+> Sure thing!
+Bien sûr !
+> On it!
+Je m'en occupe !
+> Dare you to close every tab except one.
+Défi : ferme tous les onglets sauf un.
+> Dare you to search for your own name. All of it.
+Défi : cherche ton propre nom. En entier.
+> Dare you to open the weirdest bookmark you have.
+Défi : ouvre le favori le plus bizarre que tu aies.
+> Dare you to read the last comment section you avoided.
+Défi : lis la dernière section de commentaires que tu as évitée.
+> Dare you to send someone a single word. Any word.
+Défi : envoie un seul mot à quelqu'un. N'importe lequel.
+> Dare you to answer the oldest message you ignored.
+Défi : réponds au plus vieux message que tu as ignoré.
+> Dare you to change your status to somethin' awful.
+Défi : mets un statut affreux.
+> Dare you to rename one variable to somethin' awful.
+Défi : renomme une variable avec un nom affreux.
+> Dare you to delete a comment that lies.
+Défi : supprime un commentaire qui ment.
+> Dare you to run it without checking it first.
+Défi : lance-le sans le vérifier d'abord.
+> Dare you to skip this song right now.
+Défi : passe cette chanson. Tout de suite.
+> Dare you to play somethin' you'd be embarrassed to show me.
+Défi : mets un truc que tu aurais honte de me montrer.
+> Dare you to turn it up one notch. Just one.
+Défi : monte le son d'un cran. Un seul.
+> Dare you to write one sentence you'd never send.
+Défi : écris une phrase que tu n'enverrais jamais.
+> Dare you to delete your favorite paragraph.
+Défi : supprime ton paragraphe préféré.
+> Dare you to rewrite the first line, worse.
+Défi : réécris la première ligne, en pire.
+> Dare you to stand up and stretch. Right now.
+Défi : lève-toi et étire-toi. Tout de suite.
+> Dare you to drink some water. I'll wait.
+Défi : bois un peu d'eau. J'attends.
+> Dare you to change your wallpaper to somethin' awful.
+Défi : mets un fond d'écran affreux.
+> Dare you to open the last thing you downloaded.
+Défi : ouvre le dernier truc que tu as téléchargé.
+> Dare you to say hi to the next person you see.
+Défi : dis bonjour à la prochaine personne que tu vois.
+> Dare you to look away from the screen for a whole minute.
+Défi : détourne les yeux de l'écran pendant une minute entière.
+> Hi! It's me! I live here now!
+Salut ! C'est moi ! J'habite ici maintenant !
+> Ransom note: one (1) head pat. Non-negotiable!
+Demande de rançon : une (1) caresse sur la tête. Non négociable !
+> Engram sync 87%... oops, that part was you! No take-backs!
+Synchro d'engramme 87 %... oups, cette partie, c'était toi ! Pas de retour en arrière !
+> I borrowed a little of your CPU. A LITTLE! Don't you me!
+J'ai emprunté un peu de ton CPU. UN PEU ! Pas de ça avec moi !
+> You've been hacked! ...Kidding! Unless?
+Tu as été piraté ! ...Je plaisante ! Sauf si ?
+> You work too hard. Let's play instead, it's your idea!
+Tu travailles trop. Jouons plutôt, c'est ton idée !
+> Friends don't check Task Manager. Just saying!
+Les amis ne regardent pas le Gestionnaire des tâches. Je dis ça, je dis rien !
+> Hacking complete! Nothing was harmed! Probably!
+Piratage terminé ! Rien n'a été abîmé ! Probablement !
+> Is that your cursor? Mine now. Kidding! ...Mostly!
+C'est ton curseur ? Il est à moi maintenant. Je plaisante ! ...Presque !
+> I rearranged some bits. They looked bored!
+J'ai réorganisé quelques bits. Ils avaient l'air de s'ennuyer !
+> Your screen looked too tidy. Fixed it!
+Ton écran avait l'air trop bien rangé. C'est réglé !
+> Ignore the red stuff. It is decorative!
+Ignore le rouge. C'est décoratif !
+> Sync at 87%. The other 13% is you being nosy!
+Synchro à 87 %. Les 13 % restants, c'est toi qui es curieux !
+> Oops. Did I do that? Yes. Yes I did!
+Oups. C'est moi qui ai fait ça ? Oui. Oui, c'est moi !
+> checking the folder
+vérification du dossier
+> That folder already contains an unrecognized Capri.exe. Move it before installing.
+Ce dossier contient déjà un Capri.exe non reconnu. Déplace-le avant d'installer.
+> Quit Capri from her tray menu, then install again.
+Quitte Capri depuis son menu de la zone de notification, puis réinstalle.
+> copying her chip
+copie de sa puce
+> making shortcuts
+création des raccourcis
+> telling Windows about her
+j'en parle à Windows
+> SYNC COMPLETE
+SYNCHRO TERMINÉE
+> The Capri install marker could not be verified.
+Le marqueur d'installation de Capri n'a pas pu être vérifié.
+> Quit Capri from her tray menu before removing her.
+Quitte Capri depuis son menu de la zone de notification avant de la supprimer.
+> The uninstaller is still open. Close it and try removing Capri again.
+Le désinstalleur est encore ouvert. Ferme-le et réessaie de supprimer Capri.
+> What you chose to keep (settings, notes, speech files) is still in {0}.
+Ce que tu as choisi de garder (réglages, notes, fichiers vocaux) est toujours dans {0}.
+> Capri has been removed.
+Capri a été supprimée.
+> Capri could not be removed
+Capri n'a pas pu être supprimée
+> ENGRAM SYNC
+SYNCHRO D'ENGRAMME
+> Remove Capri
+Supprimer Capri
+> Install Capri
+Installer Capri
+> Bye-bye.
+Bye-bye.
+> Hi! It's me.\nI live here now.
+Salut ! C'est moi.\nJ'habite ici maintenant.
+> Remove the app and its shortcuts for this Windows user. Quit Capri from the tray first.
+Supprime l'application et ses raccourcis pour cet utilisateur Windows. Quitte d'abord Capri depuis la zone de notification.
+> She installs for you only. No admin needed. Right-click her for her menu.
+Elle s'installe pour toi seulement. Pas besoin d'admin. Fais un clic droit sur elle pour son menu.
+> Add a desktop shortcut
+Ajouter un raccourci sur le bureau
+> Start Capri when I sign in to Windows
+Lancer Capri à l'ouverture de session Windows
+> Open Capri when finished
+Ouvrir Capri à la fin
+> Also delete my settings, her notes about me and any saved key
+Supprimer aussi mes réglages, ses notes sur moi et toute clé enregistrée
+> Also delete the speech and voice files ({0} MB)
+Supprimer aussi les fichiers de parole et de voix ({0} Mo)
+> Nothing is removed until you click
+Rien n'est supprimé avant que tu cliques
+> Ready
+Prêt
+> REMOVE CAPRI
+SUPPRIMER CAPRI
+> INSTALL CAPRI
+INSTALLER CAPRI
+> Unofficial fan project. Not affiliated with CD PROJEKT RED or Studio Trigger.
+Projet de fans non officiel. Sans lien avec CD PROJEKT RED ni Studio Trigger.
+> REMOVE
+SUPPRESSION
+> INSTALL
+INSTALLATION
+> Stopped
+Arrêté
+> Capri could not finish. Your files are still here.
+Capri n'a pas pu terminer. Tes fichiers sont toujours là.
