@@ -375,7 +375,7 @@ namespace CapriDesktop
             menu.ShowImageMargin = false;
             menu.ShowCheckMargin = true;
             Neon.Shape(menu, 10);
-            ToolStripMenuItem title = new ToolStripMenuItem("CAPRI // 0.2.0");
+            ToolStripMenuItem title = new ToolStripMenuItem("CAPRI // " + Assembly.GetExecutingAssembly().GetName().Version.Major + "." + Assembly.GetExecutingAssembly().GetName().Version.Minor);
             title.Name = "title";
             title.Enabled = false;
             menu.Items.Add(title);
