@@ -21,7 +21,7 @@ By default everything runs locally. There is no account and no telemetry, and th
 
 ## Download
 
-The latest release is **V2**. Get `Capri-Setup.exe` from the [Releases](../../releases) page and run it. Windows may show a SmartScreen warning because the file is not code-signed; the source is all here, and you can build it yourself (below).
+The latest release is **V2.2**. Get `Capri-Setup.exe` from the [Releases](../../releases) page and run it. Windows may show a SmartScreen warning because the file is not code-signed; the source is all here, and you can build it yourself (below).
 
 ## What she does
 
@@ -111,6 +111,28 @@ She uses it automatically when it is there (Chat menu shows which ears are activ
 ### Voice lines (optional)
 
 Nothing is bundled. Put `.wav` clips in `%LocalAppData%\Capri\voices` named for an occasion (`pat.wav`, `hello-2.wav`, ...). A `README.txt` is written into that folder with the full list of names.
+
+## Languages
+
+Her menus, windows, installer and canned lines come in English, Polski, Français, Deutsch, Español, Italiano and Português. Pick one in the tray menu under Language (the installer also asks); it takes effect the next time she starts. The translations are machine-made and have not been checked by native speakers, so some wording may be off. Corrections are welcome.
+
+With a language chosen, a model is also told to answer in it. How well that works depends on the model: small local models are weaker outside English. Her exact lines from the show, and typed or spoken commands ("set a timer for 10 minutes"), stay in English.
+
+### Fix or add a language
+
+Each language is one plain text file in `assets\lang`, named by its two-letter code (`fr.txt`, `pt.txt`). A line starting with `> ` is the English wording and the line under it is the translation:
+
+```
+> Hide Capri
+Cacher Capri
+```
+
+Keep `{0}` and `{1}` as they are, write `\n` for a new line, and delete a pair to fall back to English. Wording with a number can have a singular and a plural form separated by `|`, such as `{0} minute|{0} minutes`.
+
+- **To fix a translation:** edit the line and open a pull request or an issue. To try it without building, put a file with the same name in `%LocalAppData%\Capri\lang` (for example `fr.txt`); it overrides the built-in one, and only the lines you include.
+- **To add a language:** copy `assets\lang\es.txt` to your code (for example `nl.txt`), translate the lines, then add its code and name to `Lang.Choices` in `app\Lang.cs`, plus its English name to `Names` there so the model is told which language to use. `build.bat` embeds every file in `assets\lang` automatically. Languages with unusual plural rules (Polish has three forms) need a rule in `Lang.Count`.
+
+Or just open an issue with the language you want.
 
 ## Build it yourself
 
