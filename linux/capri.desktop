@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Capri Desktop Companion
+Comment=Animated desktop companion
+Exec=AppRun
+Icon=io.github.zetsukae.CapriDesktopLinux
+Terminal=false
+Type=Application
+Categories=Utility;
+Keywords=Capri;companion;desktop;AI;
+StartupNotify=false

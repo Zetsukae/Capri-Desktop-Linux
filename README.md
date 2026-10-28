@@ -3,150 +3,92 @@
   <img src="assets/capri.png" alt="Capri" width="40%" align="middle">
 </p>
 
-# Capri
+# Capri Desktop for Linux
 
-A small desktop companion for Windows: Capri, from *Cyberpunk: Edgerunners*, lives on your screen. She sits there, stretches, yawns, falls asleep, peeks in from the edge, sits on your windows, gets head pats, and plays tricks on your screen. If you connect an AI model she also talks to you, and can look at your screen when you ask.
+An unofficial Linux desktop companion featuring Capri from *Cyberpunk: Edgerunners*. The app is a native GTK 4 application with an animated character, direct AI chat, and a transparent character-first interface.
 
-Beware that Capri may try to take over your human CPU. No responsibility is taken for her actions.
-
-By default everything runs locally. There is no account and no telemetry, and the only thing she talks to is a model server on your own machine. You can optionally connect a cloud model with your own API key (see below); that is off until you switch it on.
+The Linux companion is maintained by Zetsukae. Capri can move around your desktop, react to clicks, and chat using a local model or an OpenAI-compatible cloud API.
 
 <p align="center">
   <img src="docs/sit.png" alt="Capri sitting" height="220">
   <img src="docs/pat.png" alt="Capri getting a head pat" height="220">
 </p>
-<p align="center">
-  <img src="docs/hack-note.png" alt="A hacked note" width="70%">
-</p>
 
-## Download
+## Download and launch
 
-The latest release is **V2.2**. Get `Capri-Setup.exe` from the [Releases](../../releases) page and run it. Windows may show a SmartScreen warning because the file is not code-signed; the source is all here, and you can build it yourself (below).
+Download the `Capri-Desktop-Linux-<architecture>.AppImage` for your system from the [Releases](../../releases) page. The project supports `x86_64` and `aarch64` AppImages.
 
-## What she does
+Make the file executable if needed, then launch it:
 
-Most of Capri works with **no AI at all**: no model, no internet, nothing extra to install. The AI is only for open-ended conversation and for looking at your screen, and all of it is optional. Anything that needs a model falls back to her built-in lines, or tells you a model is needed.
-
-### Works without any AI
-
-**Alive on your desktop**
-- Idle reactions: stretching, looking around, yawning, falling asleep, peeking from the screen edge. Each can be switched off.
-- Head pats: hover over her, or click.
-- She sits on the top edge of your windows and follows them when they move. Drop her on one to seat her.
-- Steps aside while a full-screen game or video is in front, and comes back after.
-- A tray menu for everything, in a black, crimson and green terminal style. **Start with Windows** is in it (off until you tick it).
-
-**Mischief** (off by default; Ctrl+Alt+C stops it at once)
-- Screen glitches in six styles: bars, tear, corruption, hex rain, a fake "ENGRAM SYNC" progress box, and a red cursor that chases yours. All of them are painted on a click-through overlay and stay gentle: low contrast, nothing flashes, and reduced motion in Windows turns them off.
-- "You've been hacked" notes.
-
-**She notices and dares** (no screen capture)
-- She remarks, rarely, when you come back after a long break, stay up late, run low on battery, max out the CPU, or sit in one program for hours. She reads only the clock, idle time, CPU, battery and the name of the program in front.
-- Dares: after about ten minutes in one program she may dare you with something quick and harmless for it ("Dare you to close every tab except one."). Say "dare me" any time, and "done" when you have. Without a model they come from her own list.
-- **Sync:** a 0 to 100% meter of how far she has got into your life. It grows with time, chatting, pats, agreeing with her and finished dares (with daily limits), opens up new glitch styles, and is shown in her sync glitch box. Ask "how's our sync?".
-
-**Errands** (typed or spoken, matched from plain words, no model needed)
-- Timers, alarms and reminders: "set a timer for 10 minutes", "wake me at 7am", "remind me in 20 minutes to stretch", and a study timer. A finished timer interrupts whatever she was saying.
-- "Open downloads", "open Discord", "open Edge": a short fixed list of folders and Windows tools, plus any program with a Start menu shortcut, found by name. "Open youtube", "open github" and a few sites open in your browser.
-- "Pause the music", "skip", "previous song", "mute", "turn it up".
-- "Search for cute cats on YouTube", "google X": opens your browser's results.
-- **"Play X on Spotify":** she opens Spotify's search, finds the Play button for that song by name (through the same accessibility interface screen readers use, so it works in any language) and presses it, then checks that something new is really playing. If she can't find it, she writes `%LocalAppData%\Capri\spotify-buttons.txt` with what she saw.
-- **"Play X on YouTube":** makes one request to youtube.com to find the first video, then opens it in your browser.
-- Speaking these needs speech recognition (below), but not a chat model.
-
-**What she remembers and says herself**
-- "Remember that my dog is called Bo." Notes live in a plain text file (`%LocalAppData%\Capri\memory.txt`) that you can read or delete. She refuses passwords. "Forget about my dog", "forget everything" and the Chat, Memory menu manage it. The notes are kept without a model; she only brings them up in conversation when a model is on.
-- Her real lines from the show for questions that have one ("who are you", "what are you", "are you an AI", and a few more).
-- She shows what music or video is playing, with a short canned cheer.
-
-### Needs an AI model
-
-Local with [Ollama](https://ollama.com) or LM Studio, or optionally a cloud model with your own key (see below).
-
-- **Chat:** a window in her style (Ctrl+Alt+T), or just talk: click the mic beside her, or press Ctrl+Alt+V, and she answers in a speech bubble.
-- **Look:** press Ctrl+Alt+L or ask "what am I looking at?" or "what should I buy here?". She takes one screenshot, sends it to your vision model, and throws it away. It is only taken when you ask, held in memory only, and never written to disk. You can switch it off in Chat, "Let her look when I ask".
-- **Dares about your screen** (off by default, and it asks first): one screenshot when she dares you, so the dare fits what is really on screen (a game, a page). It goes only to your local model, and to a cloud model only if you allowed screenshots there. She stays hidden in fullscreen games unless you switch off Hide in fullscreen.
-- Dares and music comments written fresh by the model instead of from her list, using her notes about you when memory is on.
-- Her tone changing with how far sync has got.
-
-## Hotkeys
-
-| Keys | What it does |
-| --- | --- |
-| Ctrl+Alt+C | Hop off the cursor, and stop any glitch |
-| Ctrl+Alt+T | Open the chat window |
-| Ctrl+Alt+V | Talk to her (click again to stop, or press DONE to send early) |
-| Ctrl+Alt+L | Look at my screen |
-
-## Setting up her brain
-
-Chat, voice and Look use a model server on your own computer. [Ollama](https://ollama.com) is the easiest.
-
-1. Install Ollama and pull a model. A vision-capable one (for example `qwen3.5:9b`) also lets her look at your screen. A text-only model works for chat.
-2. In her tray menu choose Chat, then Use a local model. She finds Ollama or LM Studio on the usual local ports. Only `localhost` and loopback addresses are accepted.
-3. Optional: put a `persona.txt` in `%LocalAppData%\Capri` to change how she talks.
-
-### Cloud models (optional)
-
-No GPU? Chat, Cloud model settings lets you use OpenRouter, OpenAI, Anthropic, or any OpenAI-style https address with **your own API key**. A Claude or ChatGPT subscription is not an API key; keys come from the provider's developer console and are billed separately (her replies are short, so a small model costs very little).
-
-- Providers show a key only once, when you create it. Copy it then; if you lose it, make a new one. Free models on OpenRouter work with a $0 key. Some models think before answering and may feel slow or sometimes answer with nothing; she retries once and tells you.
-- If a model says "the request was refused", she tries once more with plain settings and shows the provider's own message. Copy the model's exact id (on OpenRouter, the copy button next to its name; free ones end in `:free`) and pick one that is not labeled "thinking" or "reasoning", since those often answer with nothing.
-- It is off until you switch it on. Your chat messages and her persona are sent to that company.
-- Screenshots (Look) and her notes about you are **not** sent unless you tick their own boxes in the dialog. Without that box, Look still works if you also run a local vision model.
-- The key is stored encrypted for your Windows account only (`%LocalAppData%\Capri\cloud.key`), never in the settings file.
-- Only https addresses are accepted for the cloud.
-
-### Better ears (optional)
-
-Install [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and put it here:
-
-```
-%LocalAppData%\Capri\speech\bin\Release\whisper-cli.exe
-%LocalAppData%\Capri\speech\models\ggml-small.en.bin
+```sh
+chmod +x Capri-Desktop-Linux-*.AppImage
+./Capri-Desktop-Linux-*.AppImage
 ```
 
-She uses it automatically when it is there (Chat menu shows which ears are active). `base.en` is faster and less accurate.
+The AppImage does not require FUSE 2 (`libfuse.so.2`), but it does use the system's Python 3, PyGObject, and GTK 4 installation. Install those runtime dependencies if Capri reports that GTK is missing:
 
-### Voice lines (optional)
+```sh
+# Fedora
+sudo dnf install python3 python3-gobject gtk4
 
-Nothing is bundled. Put `.wav` clips in `%LocalAppData%\Capri\voices` named for an occasion (`pat.wav`, `hello-2.wav`, ...). A `README.txt` is written into that folder with the full list of names.
-
-## Languages
-
-Her menus, windows, installer and canned lines come in English, Polski, Français, Deutsch, Español, Italiano and Português. Pick one in the tray menu under Language (the installer also asks); it takes effect the next time she starts. The translations are machine-made and have not been checked by native speakers, so some wording may be off. Corrections are welcome.
-
-With a language chosen, a model is also told to answer in it. How well that works depends on the model: small local models are weaker outside English. Her exact lines from the show, and typed or spoken commands ("set a timer for 10 minutes"), stay in English.
-
-### Fix or add a language
-
-Each language is one plain text file in `assets\lang`, named by its two-letter code (`fr.txt`, `pt.txt`). A line starting with `> ` is the English wording and the line under it is the translation:
-
-```
-> Hide Capri
-Cacher Capri
+# Debian or Ubuntu
+sudo apt install python3 python3-gi gir1.2-gtk-4.0
 ```
 
-Keep `{0}` and `{1}` as they are, write `\n` for a new line, and delete a pair to fall back to English. Wording with a number can have a singular and a plural form separated by `|`, such as `{0} minute|{0} minutes`.
+## Features
 
-- **To fix a translation:** edit the line and open a pull request or an issue. To try it without building, put a file with the same name in `%LocalAppData%\Capri\lang` (for example `fr.txt`); it overrides the built-in one, and only the lines you include.
-- **To add a language:** copy `assets\lang\es.txt` to your code (for example `nl.txt`), translate the lines, then add its code and name to `Lang.Choices` in `app\Lang.cs`, plus its English name to `Names` there so the model is told which language to use. `build.bat` embeds every file in `assets\lang` automatically. Languages with unusual plural rules (Polish has three forms) need a rule in `Lang.Count`.
+- Animated idle poses and optional idle movement.
+- Left-click Capri to give her a pat, drag her to move the window, and right-click for settings.
+- Transparent character-first window by default, with controls for background transparency and compositor-supported blur.
+- Adjustable character size and speech-bubble display time.
+- Direct chat from the main window. Replies appear in an animated, typewriter-style speech bubble.
+- Conversation context is kept in memory while the app is running.
+- Automatically checks local Ollama and LM Studio endpoints and can detect available models.
+- Optional chat with an OpenAI-compatible cloud API.
 
-Or just open an issue with the language you want.
+Desktop placement and background effects depend on the desktop environment and compositor. In particular, blur is not available on every system. Settings are saved in `~/.config/capri/settings.json` (or `$XDG_CONFIG_HOME/capri/settings.json`).
 
-## Build it yourself
+## Set up AI chat
 
-Windows with the .NET Framework 4 (already part of Windows 10 and 11). No other tools or packages.
+### Local model
 
+1. Install and start [Ollama](https://ollama.com) or LM Studio, then download a chat model in that application.
+2. Launch Capri and right-click her to open settings. Capri checks common local endpoints on startup; choose **Detect local models** to scan again.
+3. Select or enter the model name and save the settings.
+
+Local model connections are restricted to this machine's loopback addresses.
+
+### Cloud API (optional)
+
+In Capri's right-click settings, enable the OpenAI-compatible cloud API option, enter the provider's API URL, model name, and API key, then choose **Save**. Providers may bill API usage separately; a subscription to a chat service is not necessarily an API key. When cloud mode is enabled, chat messages are sent to the configured provider.
+
+## Build from source
+
+Install Python 3 and GTK 4 with the Python bindings:
+
+```sh
+# Fedora
+sudo dnf install python3 python3-gobject gtk4
+
+# Debian or Ubuntu
+sudo apt install python3 python3-gi gir1.2-gtk-4.0
 ```
-build.bat
+
+Run the app from the repository directory:
+
+```sh
+./linux/run.sh
 ```
 
-This builds `build\Capri.exe`, then `build\Capri-Setup.exe`, which contains `Capri.exe`. Quit Capri first if she is running from the build folder.
+### Build an AppImage
 
-The art is embedded from `assets\art`. `tools\make-art.ps1` rebuilds those trimmed sprites from full-size frames, which are not kept in this repository (put them in `assets\originals` if you have them).
+Install `mksquashfs` and `appimagetool` for your architecture, then run:
 
-Her smoke test is built in: `Capri.exe --smoke-test <folder>` runs the checks and saves screenshots to the folder.
+```sh
+./linux/build-appimage.sh
+```
+
+The output is `build/Capri-Desktop-Linux-<architecture>.AppImage`. You can pass a different output path as the first argument, or select an `appimagetool` executable with `APPIMAGETOOL=/path/to/appimagetool`. The generated AppImage includes Capri and her artwork; Python 3, PyGObject, and GTK 4 are still required at runtime.
 
 ## Disclaimer
 

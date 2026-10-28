@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+APPDIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PYTHON=${PYTHON:-python3}
+
+if ! "$PYTHON" -c 'import gi; gi.require_version("Gtk", "4.0"); from gi.repository import Gtk' >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+Capri needs Python 3, PyGObject, and GTK 4 on this system.
+
+Fedora:       sudo dnf install python3 python3-gobject gtk4
+Debian/Ubuntu: sudo apt install python3 python3-gi gir1.2-gtk-4.0
+EOF
+    exit 1
+fi
+
+exec "$PYTHON" "$APPDIR/usr/share/capri/linux/capri.py" "$@"
